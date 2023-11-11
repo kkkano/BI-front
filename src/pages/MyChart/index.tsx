@@ -1,10 +1,12 @@
 
-import { listMyChartByPageUsingPOST } from '@/services/yubi/chartController';
+import { deleteChartUsingPOST, listMyChartByPageUsingPOST } from '@/services/yubi/chartController';
 import { useModel } from '@@/exports';
-import {Avatar, Card, List, message, Result} from 'antd';
+import {Avatar, Card, Col, List, message, Result, Row, Tag} from 'antd';
 import ReactECharts from 'echarts-for-react';
 import React, { useEffect, useState } from 'react';
 import Search from "antd/es/input/Search";
+
+
 
 /**
  * 我的图表页面
@@ -58,6 +60,39 @@ const MyChartPage: React.FC = () => {
     // 搜索结束设置为false
     setLoading(false);
   };
+
+  useEffect(() => {
+    loadData();
+  }, [searchParams]);
+
+  useEffect(() => {}, []);
+
+  // const handleDeleteChart = async (id:number)=> {
+  //   const param = {
+ 
+  //    id:id
+  const handleDeleteChart = async (id:number) => {
+    const confirmed = window.confirm("确定要删除吗？");
+    
+    if (confirmed) {
+      const param = {
+        id: id,
+      
+      };
+    
+  //   };
+  
+    const result =  deleteChartUsingPOST(param);
+    if((await result).data === false){
+      message.error("删除失败")
+    }else{
+      message.error("删除成功!")
+    }
+    // 删除完成后调用setRefreshData来刷新页面数据
+    loadData();
+  };
+  }
+
 
   useEffect(() => {
     loadData();
@@ -126,7 +161,24 @@ const MyChartPage: React.FC = () => {
               <List.Item.Meta
                 // 把当前登录用户信息的头像展示出来
                 avatar={<Avatar src={currentUser && currentUser.userAvatar} />}
-                title={item.name}
+                // title={item.name}
+                title={
+                  <>
+                    <Row>
+                      <Col lg={8} md={14}>
+                        {item.name}
+                      </Col>
+                      <Col>
+                        <Tag color={'red'}>生成时间: </Tag>
+                      </Col>
+                      <Col lg={8}>{new Date(item.createTime as string).toLocaleString()}</Col>
+                      <Col>
+                      <a onClick={() => item.id && handleDeleteChart(item.id)}>删除</a>
+                      </Col>
+                    </Row>
+                  </>
+                }
+
                 description={item.chartType ? '图表类型：' + item.chartType : undefined}
               />
               <>
@@ -158,6 +210,7 @@ const MyChartPage: React.FC = () => {
                   item.status === 'succeed' && <>
                     <div style={{ marginBottom: 16 }} />
                     <p>{'分析目标：' + item.goal}</p>
+                    <p>{'分析结论：' + item.genResult}</p>
                     <div style={{ marginBottom: 16 }} />
                     <ReactECharts option={item.genChart && JSON.parse(item.genChart)} />
                   </>
@@ -168,8 +221,8 @@ const MyChartPage: React.FC = () => {
                     <Result
                       status="error"
                       title="图表生成失败"
-                      subTitle={item.execMessage}
-                    />
+                      subTitle={item.execMessage}/>
+                       <div style={{ marginBottom: 47 }} />
                   </>
                 }
               </>
