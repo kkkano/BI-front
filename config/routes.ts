@@ -7,6 +7,13 @@
   { path: '/add_chart_async_mq', name: '智能分析(异步 MQ实现)', icon: 'barChart', component: './AddChartAsyncmq' },
   { name:'我的图表',path: '/my_chart', icon: 'pieChart', component: './MyChart' },
   {
+    name: 'center',
+    path: 'account/settings',
+    icon: 'user',
+    component: './User/UpdateUser',
+    hideInMenu: true
+  },
+  {
     path: '/admin',
     icon: 'crown',
     access: 'canAdmin',

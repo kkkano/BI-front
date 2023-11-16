@@ -150,6 +150,30 @@ export async function updateUserUsingPOST(
   });
 }
 
+// export async function updateUserInfoUsingPOST(
+//   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+//   params: API.updateUserInfoUsingPOSTParams,
+//   body: {},
+//   file?: File,
+//   options?: { [key: string]: any },
+// ) {
+//   const formData = new FormData();
+
+//   if (file) {
+//     formData.append('file', file);
+//   }
+
+//   Object.keys(body).forEach((ele) => {
+//     const item = (body as any)[ele];
+
+//     if (item !== undefined && item !== null) {
+//       formData.append(
+//         ele,
+//         typeof item === 'object' && !(item instanceof File) ? JSON.stringify(item) : item,
+//       );
+//     }
+//   });
+
 /** updateMyUser POST /api/user/update/my */
 export async function updateMyUserUsingPOST(
   body: API.UserUpdateMyRequest,
