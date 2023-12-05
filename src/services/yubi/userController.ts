@@ -67,6 +67,14 @@ export async function getUserVOByIdUsingGET(
   });
 }
 
+/** getAllUsers GET /api/user/getalluser */
+export async function getAllUsersUsingGET(options?: { [key: string]: any }) {
+  return request<API.User[]>('/api/user/getalluser', {
+    method: 'GET',
+    ...(options || {}),
+  });
+}
+
 /** listUserByPage POST /api/user/list/page */
 export async function listUserByPageUsingPOST(
   body: API.UserQueryRequest,
@@ -149,30 +157,6 @@ export async function updateUserUsingPOST(
     ...(options || {}),
   });
 }
-
-// export async function updateUserInfoUsingPOST(
-//   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
-//   params: API.updateUserInfoUsingPOSTParams,
-//   body: {},
-//   file?: File,
-//   options?: { [key: string]: any },
-// ) {
-//   const formData = new FormData();
-
-//   if (file) {
-//     formData.append('file', file);
-//   }
-
-//   Object.keys(body).forEach((ele) => {
-//     const item = (body as any)[ele];
-
-//     if (item !== undefined && item !== null) {
-//       formData.append(
-//         ele,
-//         typeof item === 'object' && !(item instanceof File) ? JSON.stringify(item) : item,
-//       );
-//     }
-//   });
 
 /** updateMyUser POST /api/user/update/my */
 export async function updateMyUserUsingPOST(

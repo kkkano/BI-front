@@ -3,7 +3,7 @@ import { DefaultFooter } from '@ant-design/pro-components';
 import '@umijs/max';
 import React from 'react';
 const Footer: React.FC = () => {
-  const defaultMessage = '10月完成';
+  const defaultMessage = 'wangxian';
   const currentYear = new Date().getFullYear();
   return (
     <DefaultFooter
@@ -13,21 +13,21 @@ const Footer: React.FC = () => {
       copyright={`${currentYear} ${defaultMessage}`}
       links={[
         {
-          key: '智能BI',
-          title: '智能BI',
-          href: 'https://pro.ant.design',
+          key: '前端代码',
+          title: '前端代码',
+          href: 'https://github.com/kkkano/BI-front',
           blankTarget: true,
         },
         {
           key: 'github',
           title: <GithubOutlined />,
-          href: 'https://github.com/ant-design/ant-design-pro',
+          href: 'https://github.com/kkkano',
           blankTarget: true,
         },
         {
-          key: '智能BI',
-          title: '智能BI',
-          href: 'https://ant.design',
+          key: '后端代码',
+          title: '后端代码',
+          href: 'https://github.com/kkkano/BI',
           blankTarget: true,
         },
       ]}

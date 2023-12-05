@@ -48,6 +48,7 @@
   "dependencies": {
     "@ant-design/icons": "^4.8.0",
     "@ant-design/pro-components": "^2.3.57",
+    "@ant-design/pro-layout": "^7.17.15",
     "@ant-design/use-emotion-css": "1.0.4",
     "@umijs/route-utils": "^2.2.2",
     "alias": "^0.0.5",

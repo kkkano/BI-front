@@ -88,10 +88,10 @@ const Login: React.FC = () => {
             maxWidth: '75vw',
           }}
           logo={<img alt="logo" src="/logo.svg" />}
-          title="智能 BI"
+          title="AIGC BI"
           subTitle={
             <a href="https://github.com/kkkano/BI" target="_blank" rel="noreferrer">
-              智能数据分析项目
+              智能数据分析平台
             </a>
           }
           onFinish={async (values) => {
