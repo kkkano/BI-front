@@ -12,6 +12,7 @@ import { Link } from '@umijs/max';
 
 const registerUser = async (userData: API.UserRegisterRequest): Promise<number | null> => {
   try {
+    // const response = await fetch('http://localhost:8101/api/user/register'
     const response = await fetch('http://localhost:8101/api/user/register', {
       method: 'POST',
       headers: {

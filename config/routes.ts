@@ -5,7 +5,7 @@
   { path: '/add_chart', name: '智能分析', icon: 'barChart', component: './AddChart' },
   { path: '/add_chart_async', name: '智能分析(异步 线程池实现)', icon: 'barChart', component: './AddChartAsync' },
   { path: '/add_chart_async_mq', name: '智能分析(异步 MQ实现)', icon: 'barChart', component: './AddChartAsyncmq' },
-  { path: '/admin', name: '管理用户', icon: 'crown' ,component: './Admin/UserManage'},
+  { path: '/admin', name: '管理用户', icon: 'crown' ,component: './Admin/UserManage',access: 'canAdmin',},
   { name:'我的图表',path: '/my_chart', icon: 'pieChart', component: './MyChart' },
   {
     name: 'center',

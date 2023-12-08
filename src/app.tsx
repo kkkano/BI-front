@@ -120,8 +120,14 @@ export const layout: RunTimeLayoutConfig = ({ initialState, setInitialState }) =
  * 它基于 axios 和 ahooks 的 useRequest 提供了一套统一的网络请求和错误处理方案。
  * @doc https://umijs.org/docs/max/request#配置
  */
+// export const request = {
+//   // baseURL: 'http://localhost:8101',
+//   baseURL: '47.100.122.205',
+//   withCredentials: true,
+//   ...errorConfig,
+// };
 export const request = {
-  baseURL: 'http://localhost:8101',
+  baseURL: 'http://localhost:8101',  // 添加协议部分，例如 http:// 或 https://
   withCredentials: true,
   ...errorConfig,
 };
