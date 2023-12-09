@@ -73,7 +73,7 @@ const UserManage: React.FC = () => {
     {
       title: '头像',
       dataIndex: 'userAvatar',
-      render: (avatar: string) => <img src={avatar} alt="User Avatar" />,
+      render: (avatar: string) => <img src={avatar} alt="User Avatar" style={{ width: '120px', height: '120px' }} />,
     },
     {
       title: '用户名',
@@ -83,6 +83,15 @@ const UserManage: React.FC = () => {
       title: '创建时间',
       dataIndex: 'createTime',
       render: (time: string) => new Date(time).toLocaleString(),
+    },
+    {
+      title: '最后更新时间',
+      dataIndex: 'updateTime',
+      render: (time: string) => new Date(time).toLocaleString(),
+    },
+    {
+      title: '用户权限',
+      dataIndex: 'userRole',
     },
     {
       title: '操作',
