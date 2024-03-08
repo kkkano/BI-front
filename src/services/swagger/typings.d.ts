@@ -99,6 +99,8 @@ declare namespace API {
   };
 
   type User = {
+    userName: any;
+    userAccount: any;
     id?: number;
     userrole?: number;
     username?: string;
@@ -109,5 +111,6 @@ declare namespace API {
     phone?: string;
     /** User Status */
     userStatus?: number;
+    usageCount?: number;
   };
 }

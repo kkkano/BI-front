@@ -92,7 +92,7 @@ const AddChart: React.FC = () => {
             rules=....是必填项提示*/}
             <Form.Item name="goal" label="分析目标" rules={[{ required: true, message: '请输入分析目标!' }]}>
                 {/* placeholder文本框内的提示语 */}
-                <TextArea placeholder="请输入你的分析需求，比如：分析网站用户的增长情况"/>
+                <TextArea placeholder="请输入你的分析需求，比如：分析网站用户的增长情况（每次消耗1积分）"/>
             </Form.Item>
 
             {/* 还要输入图表名称 */}

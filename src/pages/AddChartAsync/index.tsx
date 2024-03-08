@@ -64,7 +64,7 @@ const AddChartAsync: React.FC = () => {
             initialValues={{  }}
             >
             <Form.Item name="goal" label="分析目标" rules={[{ required: true, message: '请输入分析目标!' }]}>
-                <TextArea placeholder="请输入你的分析需求，比如：分析网站用户的增长情况"/>
+                <TextArea placeholder="请输入你的分析需求，比如：分析网站用户的增长情况 （每次消耗1积分）"/>
             </Form.Item>
 
             <Form.Item name="name" label="图表名称">

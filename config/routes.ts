@@ -8,6 +8,7 @@
   { path: '/admin', name: '管理用户', icon: 'crown' ,component: './Admin/UserManage',access: 'canAdmin',},
   { name:'我的图表',path: '/my_chart', icon: 'pieChart', component: './MyChart' },
   { path: '/UserCheckIn', name: '每日签到', icon: 'home', component: './User/CheckIn' },
+  { path: '/UseAnalysis', name: '使用分析', icon: 'pieChart', component: './User/UseAnalysis',access: 'canAdmin', },
   {
     name: 'center',
     path: 'account/settings',
