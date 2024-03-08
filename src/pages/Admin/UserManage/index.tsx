@@ -144,9 +144,9 @@ const UserManage: React.FC = () => {
           <Form.Item name="userAvatar" label="Avatar" rules={[{ required: true, message: '请输入头像链接' }]}>
             <Input />
           </Form.Item>
-          {/* <Form.Item name="points" label="points" rules={[{ required: true, message: '请输入积分' }]}>
-    <Input type="number" /> 如果points是数字类型，确保输入框也对应处理 */}
-{/* </Form.Item> */}
+          <Form.Item name="points" label="points" rules={[{ required: true, message: '请输入积分' }]}>
+    <Input type="number" /> 
+</Form.Item>
           {/* 添加其他字段的表单项 */}
         </Form>
       </Modal>

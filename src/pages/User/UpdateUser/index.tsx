@@ -61,8 +61,12 @@ const UserProfile: React.FC = () => {
             <Input value={new Date(user.updateTime).toLocaleString()} readOnly />
           </Form.Item>
           <Form.Item label="用户权限">
-            <Input value={user.userRole} readOnly />
-          </Form.Item>
+  <Input value={user.userRole} readOnly />
+</Form.Item>
+          <div>
+  
+  <p><strong>剩余积分: </strong>{user.points}</p>
+</div>
           <Button type="primary" onClick={handleSave} style={{ marginRight: '10px' }}>保存</Button>
           <Button onClick={handleCancel}>取消</Button>
         </Col>

@@ -378,6 +378,9 @@ declare namespace API {
   };
 
   type UserUpdateMyRequest = {
+    lastCheckIn?: string;
+    points?: number;
+    usageCount?: number;
     userAvatar?: string;
     userName?: string;
     userProfile?: string;
