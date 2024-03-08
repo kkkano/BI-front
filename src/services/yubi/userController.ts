@@ -14,6 +14,14 @@ export async function addUserUsingPOST(body: API.UserAddRequest, options?: { [ke
   });
 }
 
+/** userCheckIn POST /api/user/checkin */
+export async function userCheckInUsingPOST(options?: { [key: string]: any }) {
+  return request<API.BaseResponseBoolean_>('/api/user/checkin', {
+    method: 'POST',
+    ...(options || {}),
+  });
+}
+
 /** deleteUser POST /api/user/delete */
 export async function deleteUserUsingPOST(
   body: API.DeleteRequest,

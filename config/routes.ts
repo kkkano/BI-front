@@ -1,4 +1,4 @@
-﻿﻿export default [
+﻿﻿﻿export default [
   { path: '/user', layout: false, routes: [{ path: '/user/login', component: './User/Login' }] },
   { path: '/user', layout: false, routes: [{ path: '/user/Register', component: './User/Register' }] },//注册路由
   { path: '/', redirect: '/add_chart' },
@@ -7,6 +7,7 @@
   { path: '/add_chart_async_mq', name: '智能分析(异步 MQ实现)', icon: 'barChart', component: './AddChartAsyncmq' },
   { path: '/admin', name: '管理用户', icon: 'crown' ,component: './Admin/UserManage',access: 'canAdmin',},
   { name:'我的图表',path: '/my_chart', icon: 'pieChart', component: './MyChart' },
+  { path: '/UserCheckIn', name: '每日签到', icon: 'home', component: './User/CheckIn' },
   {
     name: 'center',
     path: 'account/settings',

@@ -335,7 +335,10 @@ declare namespace API {
     createTime?: string;
     id?: number;
     isDelete?: number;
+    lastCheckIn?: string;
+    points?: number;
     updateTime?: string;
+    usageCount?: number;
     userAccount?: string;
     userAvatar?: string;
     userName?: string;
@@ -382,6 +385,9 @@ declare namespace API {
 
   type UserUpdateRequest = {
     id?: number;
+    lastCheckIn?: string;
+    points?: number;
+    usageCount?: number;
     userAvatar?: string;
     userName?: string;
     userProfile?: string;

@@ -90,6 +90,19 @@ const UserManage: React.FC = () => {
       render: (time: string) => new Date(time).toLocaleString(),
     },
     {
+      title: '使用总次数',
+      dataIndex: 'usageCount',
+    },
+    {
+      title: '剩余积分',
+      dataIndex: 'points',
+    },
+    {
+      title: '最后签到时间',
+      dataIndex: 'lastCheckIn',
+      render: (time: string) => new Date(time).toLocaleString(),
+    },
+    {
       title: '用户权限',
       dataIndex: 'userRole',
     },
@@ -123,12 +136,17 @@ const UserManage: React.FC = () => {
         destroyOnClose
       >
         <Form form={editForm}>
+
           <Form.Item name="userName" label="Username" rules={[{ required: true, message: '请输入用户名' }]}>
             <Input />
           </Form.Item>
+
           <Form.Item name="userAvatar" label="Avatar" rules={[{ required: true, message: '请输入头像链接' }]}>
             <Input />
           </Form.Item>
+          {/* <Form.Item name="points" label="points" rules={[{ required: true, message: '请输入积分' }]}>
+    <Input type="number" /> 如果points是数字类型，确保输入框也对应处理 */}
+{/* </Form.Item> */}
           {/* 添加其他字段的表单项 */}
         </Form>
       </Modal>

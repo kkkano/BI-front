@@ -125,7 +125,7 @@ const AddChart: React.FC = () => {
                     这里肯定是调用自己的后端，先不用这个;
                     maxCount={1} 限制文件上传数量为1 */}
                 <Upload name="file" maxCount={1}>
-                  <Button icon={<UploadOutlined />}>上传 CSV 文件</Button>
+                  <Button icon={<UploadOutlined />}>上传文件的后缀.xlsx</Button>
                 </Upload>
               </Form.Item>
               {/* offset设置和label标签一样的宽度，这样就能保持对齐；

@@ -91,7 +91,7 @@ const AddChartAsync: React.FC = () => {
                 label="原始数据"
               >
                 <Upload name="file" maxCount={1}>
-                  <Button icon={<UploadOutlined />}>上传 CSV 文件</Button>
+                  <Button icon={<UploadOutlined />}>上传 CSV 文件后缀要为.xlsx</Button>
                 </Upload>
               </Form.Item>
               <Form.Item wrapperCol={{ span: 16, offset: 4 }}>
