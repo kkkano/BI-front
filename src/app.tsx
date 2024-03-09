@@ -128,7 +128,7 @@ export const layout: RunTimeLayoutConfig = ({ initialState, setInitialState }) =
 // };
 export const request = {
   // baseURL: 'http://47.100.122.205', 
-  baseURL: 'http://localhost:8101', // 添加协议部分，例如 http:// 或 https://
+  baseURL: 'http://47.100.122.205', // 添加协议部分，例如 http:// 或 https://
   withCredentials: true,
   ...errorConfig,
 };
