@@ -55,6 +55,7 @@
     "antd": "^5.2.2",
     "classnames": "^2.3.2",
     "css-loader": "^6.8.1",
+    "echarts": "^5.5.0",
     "echarts-for-react": "^3.0.2",
     "less": "^4.2.0",
     "less-loader": "^11.1.3",
