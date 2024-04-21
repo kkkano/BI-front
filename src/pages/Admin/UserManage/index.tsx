@@ -1,12 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Popconfirm, message, Modal, Form, Input } from 'antd';
-import { getAllUsersUsingGET, deleteUserUsingPOST, updateUserUsingPOST, getLoginUserUsingGET } from '@/services/yubi/userController';
+import { Table, Popconfirm, message, Modal, Form, Input, Button } from 'antd';
+import { getAllUsersUsingGET, deleteUserUsingPOST, updateUserUsingPOST, getLoginUserUsingGET, addUserUsingPOST,searchUsersUsingGET } from '@/services/yubi/userController';
+import styled from 'styled-components';
+import { SearchOutlined } from '@ant-design/icons';
 
 const UserManage: React.FC = () => {
   const [users, setUsers] = useState<any[]>([]);
   const [editingUser, setEditingUser] = useState<any | null>(null);
   const [editForm] = Form.useForm();
   const [userRole, setUserRole] = useState<string | null>(null); // 新增用户角色状态
+  const [isAddModalVisible, setIsAddModalVisible] = useState(false); // 控制新增用户信息框显示/隐藏
+  const [searchText, setSearchText] = useState('');
   useEffect(() => {
     fetchUsers();
     fetchUserRole();
@@ -18,6 +22,15 @@ const UserManage: React.FC = () => {
       setUsers(response); // 将获取到的用户数据设置到 state 中
     } catch (error) {
       console.error(error);
+    }
+  };
+  const onSearch = async () => {
+    try {
+      const response = await searchUsersUsingGET({ userName: searchText });
+      setUsers(response);
+    } catch (error) {
+      console.error(error);
+      message.error('搜索用户失败');
     }
   };
   const fetchUserRole = async () => {
@@ -63,6 +76,26 @@ const UserManage: React.FC = () => {
   const handleCancel = () => {
     setEditingUser(null);
     editForm.resetFields();
+  };
+  const handleAddUser = () => {
+    setIsAddModalVisible(true);
+  };
+  const handleAddUserSubmit = async () => {
+    try {
+      const values = await editForm.validateFields();
+      const response = await addUserUsingPOST(values);
+      console.log(response)
+      if (response.message === 'ok') {
+        message.success('新增用户成功');
+        fetchUsers();
+        setIsAddModalVisible(false); // 关闭新增用户信息框
+      } else {
+        message.error('账号已存在');
+      }
+    } catch (error) {
+      console.error(error);
+      message.error('新增用户失败');
+    }
   };
 
   const columns = [
@@ -123,12 +156,61 @@ const UserManage: React.FC = () => {
       ),
     },
   ];
-
-  return userRole === 'admin' ?(
+  const SmallButton = styled.button`
+  font-size: 15px;
+  padding: 5px 12px;
+  margin-left: auto;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px; /* 设置圆角边框 */
+  transition: background-color 0.3s, color 0.3s;
+  margin-top: 10px; /* 下移10像素 */
+  &:hover {
+      background-color: lightblue;
+      color: navy;
+  }
+  cursor: pointer; /* 设置光标为手指形状 */
+  box-shadow: 2px 2px 4px rgba(1, 1, 1, 0.2); /* 设置阴影效果 */
+`;
+  return userRole === 'admin' ? (
     <>
+        <Input.Search
+        placeholder="输入用户名进行搜索"
+        enterButton={<Button type="primary" icon={<SearchOutlined />} onClick={onSearch} />}
+        value={searchText}
+        onChange={(e) => setSearchText(e.target.value)}
+      />
+      
+      <SmallButton type="primary" onClick={handleAddUser}>新增用户</SmallButton>
       <Table dataSource={users} columns={columns} rowKey="id" />
-
+      
+  
       <Modal
+        visible={isAddModalVisible}
+        title="添加用户"
+        onCancel={() => setIsAddModalVisible(false)}
+        onOk={handleAddUserSubmit}
+      >
+        <Form form={editForm}>
+          <Form.Item name="userAccount" label="账号"    rules={[{ required: true, message: '请输入账号' }, { min: 4, message: '用户账号过短' }]}>
+            <Input placeholder="请输入账号" />
+          </Form.Item>
+          <Form.Item name="userPassword" label="密码" rules={[{ required: true, message: '请输入密码' }, { min: 8, message: '用户密码过短' }]}>
+            <Input.Password placeholder="请输入密码" />
+          </Form.Item>
+          <Form.Item name="userName" label="用户昵称">
+            <Input placeholder="请输入用户昵称" />
+          </Form.Item>
+
+          <Form.Item name="userRole" label="用户角色">
+  <Input placeholder="请输入用户角色" defaultValue="user" disabled />
+</Form.Item>
+        </Form>
+      </Modal>
+ 
+      <Modal
+      
         visible={!!editingUser}
         title="编辑用户信息"
         onCancel={handleCancel}
@@ -151,175 +233,7 @@ const UserManage: React.FC = () => {
         </Form>
       </Modal>
     </>
-  ):null;
+  ) : null;
 };
 
 export default UserManage;
-/**import React, { useEffect, useState } from 'react';
-import { Table, Popconfirm, message, Modal, Form, Input, Upload, Button } from 'antd';
-import { UploadOutlined } from '@ant-design/icons';
-import {
-  getAllUsersUsingGET,
-  deleteUserUsingPOST,
-  updateUserUsingPOST,
-} from '@/services/yubi/userController';
-
-const UserManage: React.FC = () => {
-  const [users, setUsers] = useState<any[]>([]);
-  const [editingUser, setEditingUser] = useState<any | null>(null);
-  const [editForm] = Form.useForm();
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
-
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  const fetchUsers = async () => {
-    try {
-      const response = await getAllUsersUsingGET();
-      setUsers(response); // 将获取到的用户数据设置到 state 中
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const deleteUser = async (id: number | undefined) => {
-    try {
-      await deleteUserUsingPOST({ id });
-      message.success('删除用户成功');
-      fetchUsers();
-    } catch (error) {
-      console.error(error);
-      message.error('删除用户失败');
-    }
-  };
-
-  const handleEdit = (record: any) => {
-    setEditingUser(record);
-    editForm.setFieldsValue({
-      ...record,
-      userAvatar: '', // 清空头像链接，以便显示上传组件
-    });
-  };
-
-  const handleSave = async () => {
-    try {
-      const values = await editForm.validateFields();
-      if (avatarFile) {
-        // 如果有上传的头像文件，则进行文件上传
-        const formData = new FormData();
-        formData.append('avatar', avatarFile);
-        // 发送请求将头像文件上传到服务器，并获取返回的链接
-        const response = await uploadAvatar(formData);
-        values.userAvatar = response.avatarUrl;
-      }
-      await updateUserUsingPOST({
-        id: editingUser.id,
-        ...values,
-      });
-      message.success('更新用户信息成功');
-      fetchUsers();
-      setEditingUser(null);
-    } catch (error) {
-      console.error(error);
-      message.error('更新用户信息失败');
-    }
-  };
-
-  const handleCancel = () => {
-    setEditingUser(null);
-    editForm.resetFields();
-  };
-
-  const uploadAvatar = async (formData: FormData) => {
-    try {
-      const response = await fetch('/api/upload-avatar', {
-        method: 'POST',
-        body: formData,
-      });
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error(error);
-      throw error;
-    }
-  };
-
-  const columns = [
-    {
-      title: 'ID',
-      dataIndex: 'id',
-    },
-    {
-      title: '头像',
-      dataIndex: 'userAvatar',
-      render: (avatar: string) => <img src={avatar} alt="User Avatar" />,
-    },
-    {
-      title: '用户名',
-      dataIndex: 'userName',
-    },
-    {
-      title: '创建时间',
-      dataIndex: 'createTime',
-      render: (time: string) => new Date(time).toLocaleString(),
-    },
-    {
-      title: '操作',
-      render: (_: any, record: any) => (
-        <>
-          <a onClick={() => handleEdit(record)}>编辑</a> |{' '}
-          <Popconfirm
-            title="确定要删除该用户吗？"
-            onConfirm={() => deleteUser(record.id)}
-            okText="确定"
-            cancelText="取消"
-          >
-            <a>删除</a>
-          </Popconfirm>
-        </>
-      ),
-    },
-  ];
-
-  return (
-    <>
-      <Table dataSource={users} columns={columns} rowKey="id" />
-
-      <Modal
-        visible={!!editingUser}
-        title="编辑用户信息"
-        onCancel={handleCancel}
-        onOk={handleSave}
-        destroyOnClose
-      >
-        <Form form={editForm}>
-          <Form.Item name="userName" label="Username" rules={[{ required: true, message: '请输入用户名' }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item name="userAvatar" label="Avatar">
-            {avatarFile ? (
-              <img src={URL.createObjectURL(avatarFile)} alt="Avatar Preview" style={{ maxWidth: '100%' }} />
-            ) : (
-              <Upload
-                accept="image/*"
-                beforeUpload={(file) => {
-                  setAvatarFile(file);
-                  return false; // 阻止默认的上传行为
-                }}
-              >
-                <Button icon={<UploadOutlined />} size="small">
-                  选择图片
-                </Button>
-              </Upload>
-            )}
-          </Form.Item>
-          {/* 添加其他字段的表单项 */
-    //       </Form>
-    //       </Modal>
-    //     </>
-    //   );
-    // };
-    
-    // export default UserManage;
-    //  */

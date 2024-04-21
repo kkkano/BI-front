@@ -14,7 +14,8 @@ const registerUser = async (userData: API.UserRegisterRequest): Promise<number |
   try {
     //'http://47.100.122.205/api/user/register'
     // const response = await fetch('http://localhost:8101/api/user/register'
-    const response = await fetch('http://47.100.122.205/api/user/register', {
+    const response = await fetch('http://localhost:8101/api/user/register',{
+    // const response = await fetch('http://47.100.122.205/api/user/register', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

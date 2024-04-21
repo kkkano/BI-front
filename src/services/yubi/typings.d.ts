@@ -195,7 +195,10 @@ declare namespace API {
   type LoginUserVO = {
     createTime?: string;
     id?: number;
+    lastCheckIn?: string;
+    points?: number;
     updateTime?: string;
+    usageCount?: number;
     userAvatar?: string;
     userName?: string;
     userProfile?: string;
@@ -327,6 +330,11 @@ declare namespace API {
     userId?: number;
   };
 
+  type searchUsersUsingGETParams = {
+    /** userName */
+    userName: string;
+  };
+
   type uploadFileUsingPOSTParams = {
     biz?: string;
   };
@@ -350,6 +358,7 @@ declare namespace API {
     userAccount?: string;
     userAvatar?: string;
     userName?: string;
+    userPassword?: string;
     userRole?: string;
   };
 
@@ -400,6 +409,9 @@ declare namespace API {
   type UserVO = {
     createTime?: string;
     id?: number;
+    lastCheckIn?: string;
+    points?: number;
+    usageCount?: number;
     userAvatar?: string;
     userName?: string;
     userProfile?: string;

@@ -151,6 +151,21 @@ export async function userRegisterUsingPOST(
   });
 }
 
+/** searchUsers GET /api/user/search */
+export async function searchUsersUsingGET(
+  // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
+  params: API.searchUsersUsingGETParams,
+  options?: { [key: string]: any },
+) {
+  return request<API.User[]>('/api/user/search', {
+    method: 'GET',
+    params: {
+      ...params,
+    },
+    ...(options || {}),
+  });
+}
+
 /** updateUser POST /api/user/update */
 export async function updateUserUsingPOST(
   body: API.UserUpdateRequest,
