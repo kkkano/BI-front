@@ -44,7 +44,7 @@ const MyChartPage: React.FC = () => {
         if (res.data.records) {
           res.data.records.forEach(data => {
             // 要把后端返回的图表字符串改为对象数组,如果后端返回空字符串，就返回'{}'
-            const chartOption = JSON.parse(data.genChart ?? '{}');
+            const chartOption = JSON.parse((data.genChart ?? '{}').replace(/'/g, '"'));
             // 把标题设为undefined
             chartOption.title = undefined;
             // 然后把修改后的数据转换为json设置回去
@@ -94,7 +94,8 @@ const MyChartPage: React.FC = () => {
   }
   const isJsonString = (str: string) => {
     try {
-      JSON.parse(str);
+      const correctedStr = str.replace(/'/g, '"');
+      JSON.parse(correctedStr);
       return true;
     } catch (e) {
       return false;
@@ -219,7 +220,7 @@ const MyChartPage: React.FC = () => {
                     <p>{'分析目标：' + item.goal}</p>
                     <p>{'分析结论：' + item.genResult}</p>
                     <div style={{ marginBottom: 16 }} />
-                    <ReactECharts option={item.genChart && isJsonString(item.genChart) ? JSON.parse(item.genChart) : {}} />
+                    <ReactECharts option={item.genChart && isJsonString(item.genChart) ? JSON.parse(item.genChart.replace(/'/g, '"')) : {}} />
                   </>
                 }
                 {
