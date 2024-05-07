@@ -92,7 +92,14 @@ const MyChartPage: React.FC = () => {
     loadData();
   };
   }
-
+  const isJsonString = (str: string) => {
+    try {
+      JSON.parse(str);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  };
 
   useEffect(() => {
     loadData();
@@ -212,7 +219,7 @@ const MyChartPage: React.FC = () => {
                     <p>{'分析目标：' + item.goal}</p>
                     <p>{'分析结论：' + item.genResult}</p>
                     <div style={{ marginBottom: 16 }} />
-                    <ReactECharts option={item.genChart && JSON.parse(item.genChart)} />
+                    <ReactECharts option={item.genChart && isJsonString(item.genChart) ? JSON.parse(item.genChart) : {}} />
                   </>
                 }
                 {
