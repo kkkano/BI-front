@@ -1,0 +1,22 @@
+name: Playground Status Ping
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/30 * * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Echo current playground head
+        run: |
+          echo "Playground heartbeat: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "Branch: ${GITHUB_REF_NAME}"
+          echo "Commit: ${GITHUB_SHA}"
+      - name: Hint
+        run: |
+          echo "Status board lives at PLAYGROUND_STATUS.md"
