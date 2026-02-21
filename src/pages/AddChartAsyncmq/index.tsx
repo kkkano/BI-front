@@ -8,13 +8,20 @@ import ReactECharts from 'echarts-for-react';
 
 /**
  * 添加图表(异步 MQ)页面 + Agent式进度追踪
+ * 轮询策略：120秒一次，最多10次；连续失败达到10次才判定追踪失败
  */
 const AddChartAsync: React.FC = () => {
   const [form] = useForm();
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [chartId, setChartId] = useState<number>();
   const [chartDetail, setChartDetail] = useState<API.Chart>();
+
   const timerRef = useRef<NodeJS.Timeout>();
+  const pollCountRef = useRef<number>(0);
+  const errorCountRef = useRef<number>(0);
+
+  const POLL_INTERVAL_MS = 120 * 1000;
+  const MAX_RETRY = 10;
 
   const statusText = useMemo(() => {
     const status = chartDetail?.status;
@@ -32,31 +39,57 @@ const AddChartAsync: React.FC = () => {
     }
   };
 
+  const resetPollingState = () => {
+    pollCountRef.current = 0;
+    errorCountRef.current = 0;
+  };
+
   const fetchChartDetail = async (id: number) => {
+    // 总轮询次数控制（120秒 * 10 次）
+    pollCountRef.current += 1;
+
     try {
       const res = await getChartByIdUsingGET({ id });
       if (res?.data) {
+        // 请求成功就清空连续失败计数
+        errorCountRef.current = 0;
         setChartDetail(res.data);
+
         if (res.data.status === 'succeed' || res.data.status === 'failed') {
           stopPolling();
           if (res.data.status === 'succeed') {
             message.success('图表生成完成啦，主人可以直接查看结果 ✨');
           }
+          return;
+        }
+
+        // 状态还在 wait/running，但轮询次数耗尽
+        if (pollCountRef.current >= MAX_RETRY) {
+          stopPolling();
+          message.warning('已轮询 10 次（每次 120 秒）仍未完成，稍后可在「我的图表」继续查看');
         }
       }
     } catch (e: any) {
-      message.error('获取任务状态失败：' + e.message);
-      stopPolling();
+      // 连续错误重试 10 次才判定失败
+      errorCountRef.current += 1;
+
+      if (errorCountRef.current >= MAX_RETRY) {
+        stopPolling();
+        message.error('状态查询连续失败 10 次，已停止自动追踪，请稍后手动查看');
+      } else {
+        message.warning(`状态查询失败，准备第 ${errorCountRef.current + 1} 次重试`);
+      }
     }
   };
 
   const startPolling = (id: number) => {
     stopPolling();
+    resetPollingState();
     // 先立即查一次
     fetchChartDetail(id);
     timerRef.current = setInterval(() => {
       fetchChartDetail(id);
-    }, 2500);
+    }, POLL_INTERVAL_MS);
   };
 
   useEffect(() => {
@@ -69,6 +102,7 @@ const AddChartAsync: React.FC = () => {
     setChartId(undefined);
     setChartDetail(undefined);
     stopPolling();
+    resetPollingState();
 
     const params = {
       ...values,
@@ -83,7 +117,7 @@ const AddChartAsync: React.FC = () => {
       }
       const id = res.data.chartId;
       setChartId(id);
-      message.success(`任务已提交（#${id}），已自动进入状态追踪`);
+      message.success(`任务已提交（#${id}），开始追踪：每 120 秒查询一次，最多 10 次`);
       form.resetFields();
       startPolling(id);
     } catch (e: any) {
@@ -95,7 +129,7 @@ const AddChartAsync: React.FC = () => {
 
   const renderResult = () => {
     if (!chartDetail) {
-      return <Alert type="info" showIcon message="提交任务后，这里会实时展示排队/执行状态和结果" />;
+      return <Alert type="info" showIcon message="提交任务后，这里会展示排队/执行状态和结果（120秒轮询）" />;
     }
 
     if (chartDetail.status === 'wait' || chartDetail.status === 'running') {
