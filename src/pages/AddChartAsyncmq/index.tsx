@@ -1,10 +1,31 @@
 import { genChartByAiAsyncMqUsingPOST, getChartTaskStatusUsingGET } from '@/services/yubi/chartController';
 import { UploadOutlined } from '@ant-design/icons';
-import { Alert, Button, Card, Descriptions, Form, Input, message, Result, Select, Space, Upload } from 'antd';
+import {
+  Alert,
+  Button,
+  Card,
+  Descriptions,
+  Divider,
+  Form,
+  Input,
+  message,
+  Result,
+  Select,
+  Space,
+  Steps,
+  Tag,
+  Upload,
+} from 'antd';
 import TextArea from 'antd/es/input/TextArea';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'antd/es/form/Form';
 import ReactECharts from 'echarts-for-react';
+
+type TaskEvent = {
+  status: string;
+  text: string;
+  at: string;
+};
 
 /**
  * 添加图表(异步 MQ)页面 + Agent式进度追踪
@@ -15,6 +36,7 @@ const AddChartAsync: React.FC = () => {
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [chartId, setChartId] = useState<number>();
   const [chartDetail, setChartDetail] = useState<API.ChartTaskStatusVO>();
+  const [events, setEvents] = useState<TaskEvent[]>([]);
 
   const timerRef = useRef<NodeJS.Timeout>();
   const pollCountRef = useRef<number>(0);
@@ -44,16 +66,34 @@ const AddChartAsync: React.FC = () => {
     errorCountRef.current = 0;
   };
 
+  const addEvent = (status: string, text: string) => {
+    setEvents((prev) => {
+      if (prev.length > 0 && prev[prev.length - 1].status === status) {
+        return prev;
+      }
+      return [
+        ...prev,
+        {
+          status,
+          text,
+          at: new Date().toLocaleString('zh-CN', { hour12: false }),
+        },
+      ];
+    });
+  };
+
   const fetchChartDetail = async (id: number) => {
-    // 总轮询次数控制（120秒 * 10 次）
     pollCountRef.current += 1;
 
     try {
       const res = await getChartTaskStatusUsingGET({ chartId: id });
       if (res?.data) {
-        // 请求成功就清空连续失败计数
         errorCountRef.current = 0;
         setChartDetail(res.data);
+
+        if (res.data.status) {
+          addEvent(res.data.status, res.data.execMessage || statusText || '状态更新');
+        }
 
         if (res.data.status === 'succeed' || res.data.status === 'failed') {
           stopPolling();
@@ -63,18 +103,18 @@ const AddChartAsync: React.FC = () => {
           return;
         }
 
-        // 状态还在 wait/running，但轮询次数耗尽
         if (pollCountRef.current >= MAX_RETRY) {
           stopPolling();
+          addEvent('timeout', '轮询次数耗尽，建议稍后手动刷新');
           message.warning('已轮询 10 次（每次 120 秒）仍未完成，稍后可在「我的图表」继续查看');
         }
       }
     } catch (e: any) {
-      // 连续错误重试 10 次才判定失败
       errorCountRef.current += 1;
 
       if (errorCountRef.current >= MAX_RETRY) {
         stopPolling();
+        addEvent('error', '状态查询连续失败 10 次，自动追踪已停止');
         message.error('状态查询连续失败 10 次，已停止自动追踪，请稍后手动查看');
       } else {
         message.warning(`状态查询失败，准备第 ${errorCountRef.current + 1} 次重试`);
@@ -85,7 +125,6 @@ const AddChartAsync: React.FC = () => {
   const startPolling = (id: number) => {
     stopPolling();
     resetPollingState();
-    // 先立即查一次
     fetchChartDetail(id);
     timerRef.current = setInterval(() => {
       fetchChartDetail(id);
@@ -101,6 +140,7 @@ const AddChartAsync: React.FC = () => {
     setSubmitting(true);
     setChartId(undefined);
     setChartDetail(undefined);
+    setEvents([]);
     stopPolling();
     resetPollingState();
 
@@ -117,6 +157,7 @@ const AddChartAsync: React.FC = () => {
       }
       const id = res.data.chartId;
       setChartId(id);
+      addEvent('submitted', `任务 #${id} 已提交`);
       message.success(`任务已提交（#${id}），开始追踪：每 120 秒查询一次，最多 10 次`);
       form.resetFields();
       startPolling(id);
@@ -159,7 +200,6 @@ const AddChartAsync: React.FC = () => {
         <Descriptions bordered column={1} size="small" style={{ marginBottom: 16 }}>
           <Descriptions.Item label="任务ID">{chartDetail.chartId}</Descriptions.Item>
           <Descriptions.Item label="状态">{statusText}</Descriptions.Item>
-          <Descriptions.Item label="分析目标">{chartDetail.goal || '-'}</Descriptions.Item>
         </Descriptions>
         <Card type="inner" title="分析结论" style={{ marginBottom: 16 }}>
           {chartDetail.genResult || '暂无'}
@@ -170,6 +210,16 @@ const AddChartAsync: React.FC = () => {
       </>
     );
   };
+
+  const timelineItems = events.map((event) => ({
+    title: (
+      <Space>
+        <Tag>{event.status}</Tag>
+        <span>{event.text}</span>
+      </Space>
+    ),
+    description: event.at,
+  }));
 
   return (
     <div className="add-chart-async">
@@ -223,7 +273,11 @@ const AddChartAsync: React.FC = () => {
         </Form>
       </Card>
 
-      <div style={{ marginTop: 16 }}>{renderResult()}</div>
+      <Card style={{ marginTop: 16 }} title="任务轨迹（Agent Timeline）">
+        {events.length === 0 ? <Alert type="info" showIcon message="任务开始后会自动记录执行轨迹" /> : <Steps direction="vertical" items={timelineItems} />}
+        <Divider style={{ margin: '12px 0' }} />
+        {renderResult()}
+      </Card>
     </div>
   );
 };
