@@ -1,4 +1,4 @@
-import { genChartByAiAsyncMqUsingPOST, getChartByIdUsingGET } from '@/services/yubi/chartController';
+import { genChartByAiAsyncMqUsingPOST, getChartTaskStatusUsingGET } from '@/services/yubi/chartController';
 import { UploadOutlined } from '@ant-design/icons';
 import { Alert, Button, Card, Descriptions, Form, Input, message, Result, Select, Space, Upload } from 'antd';
 import TextArea from 'antd/es/input/TextArea';
@@ -14,7 +14,7 @@ const AddChartAsync: React.FC = () => {
   const [form] = useForm();
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [chartId, setChartId] = useState<number>();
-  const [chartDetail, setChartDetail] = useState<API.Chart>();
+  const [chartDetail, setChartDetail] = useState<API.ChartTaskStatusVO>();
 
   const timerRef = useRef<NodeJS.Timeout>();
   const pollCountRef = useRef<number>(0);
@@ -49,7 +49,7 @@ const AddChartAsync: React.FC = () => {
     pollCountRef.current += 1;
 
     try {
-      const res = await getChartByIdUsingGET({ id });
+      const res = await getChartTaskStatusUsingGET({ chartId: id });
       if (res?.data) {
         // 请求成功就清空连续失败计数
         errorCountRef.current = 0;
@@ -157,7 +157,7 @@ const AddChartAsync: React.FC = () => {
     return (
       <>
         <Descriptions bordered column={1} size="small" style={{ marginBottom: 16 }}>
-          <Descriptions.Item label="任务ID">{chartDetail.id}</Descriptions.Item>
+          <Descriptions.Item label="任务ID">{chartDetail.chartId}</Descriptions.Item>
           <Descriptions.Item label="状态">{statusText}</Descriptions.Item>
           <Descriptions.Item label="分析目标">{chartDetail.goal || '-'}</Descriptions.Item>
         </Descriptions>

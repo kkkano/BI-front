@@ -16,9 +16,9 @@ declare namespace API {
     message?: string;
   };
 
-  type BaseResponseChart_ = {
+  type BaseResponseChartTaskStatusVO_ = {
     code?: number;
-    data?: Chart;
+    data?: ChartTaskStatusVO;
     message?: string;
   };
 
@@ -125,16 +125,12 @@ declare namespace API {
     name?: string;
   };
 
-  type ChartQueryRequest = {
-    chartType?: string;
-    current?: number;
-    goal?: string;
-    id?: number;
-    name?: string;
-    pageSize?: number;
-    sortField?: string;
-    sortOrder?: string;
-    userId?: number;
+  type ChartTaskStatusVO = {
+    chartId?: number;
+    execMessage?: string;
+    genChart?: string;
+    genResult?: string;
+    status?: string;
   };
 
   type ChartUpdateRequest = {
@@ -172,9 +168,9 @@ declare namespace API {
     name?: string;
   };
 
-  type getChartByIdUsingGETParams = {
-    /** id */
-    id?: number;
+  type getChartTaskStatusUsingGETParams = {
+    /** chartId */
+    chartId?: number;
   };
 
   type getPostVOByIdUsingGETParams = {

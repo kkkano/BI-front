@@ -170,13 +170,13 @@ export async function genChartByAiAsyncMqUsingPOST(
   });
 }
 
-/** getChartById GET /api/chart/get */
-export async function getChartByIdUsingGET(
+/** getChartTaskStatus GET /api/chart/task/status */
+export async function getChartTaskStatusUsingGET(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
-  params: API.getChartByIdUsingGETParams,
+  params: API.getChartTaskStatusUsingGETParams,
   options?: { [key: string]: any },
 ) {
-  return request<API.BaseResponseChart_>('/api/chart/get', {
+  return request<API.BaseResponseChartTaskStatusVO_>('/api/chart/task/status', {
     method: 'GET',
     params: {
       ...params,
