@@ -1,11 +1,11 @@
 # 🎢 Agentic Playground Status Board
 
-> 自动更新规则：每次推送到 `feat/agentic-playground`，会自动刷新下面 3 行。
+> 自动更新规则：每次推送到 `feat/agentic-playground`，会自动刷新下面 3 行（中国时间）。
 
 ## 自动心跳（Auto)
-- Auto ping: **2026-02-21 16:14 UTC**
-- Latest commit: **ca25f5b**
-- Message: **feat(agentic): polling policy 120s interval with up to 10 retries**
+- Auto ping: **2026-02-22 00:18 CST (UTC+8)**
+- Latest commit: **6e70e50**
+- Message: **feat(status): auto-refresh playground board via GitHub Actions**
 
 ## 当前阶段
 - **Phase 2 / 4：前后端任务追踪联动（进行中）**
@@ -26,3 +26,4 @@
 
 ## Changelog
 - 2026-02-21 15:20 UTC: 创建状态看板
+- 2026-02-22 00:18 CST: 看板时间切换为中国时区（UTC+8）
