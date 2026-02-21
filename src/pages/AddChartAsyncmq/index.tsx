@@ -1,81 +1,164 @@
-import { genChartByAiAsyncMqUsingPOST,  } from '@/services/yubi/chartController';
+import { genChartByAiAsyncMqUsingPOST, getChartByIdUsingGET } from '@/services/yubi/chartController';
 import { UploadOutlined } from '@ant-design/icons';
-import { Button, Card, Form, Input, message, Select, Space, Upload } from 'antd';
+import { Alert, Button, Card, Descriptions, Form, Input, message, Result, Select, Space, Upload } from 'antd';
 import TextArea from 'antd/es/input/TextArea';
-import React, { useState } from 'react';
-import {useForm} from "antd/es/form/Form";
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useForm } from 'antd/es/form/Form';
+import ReactECharts from 'echarts-for-react';
 
 /**
- * 添加图表(异步)页面
- * @constructor
+ * 添加图表(异步 MQ)页面 + Agent式进度追踪
  */
 const AddChartAsync: React.FC = () => {
-  // useForm：and design操作表单的语法
   const [form] = useForm();
-  // 提交中的状态，默认未提交
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const [chartId, setChartId] = useState<number>();
+  const [chartDetail, setChartDetail] = useState<API.Chart>();
+  const timerRef = useRef<NodeJS.Timeout>();
 
-  /**
-   * 提交
-   * @param values
-   */
-    const onFinish = async (values: any) => {
-      // 如果已经是提交中的状态(还在加载)，直接返回，避免重复提交
-    if (submitting) {
-      return;
+  const statusText = useMemo(() => {
+    const status = chartDetail?.status;
+    if (status === 'wait') return '排队中';
+    if (status === 'running') return '分析中';
+    if (status === 'succeed') return '分析完成';
+    if (status === 'failed') return '分析失败';
+    return '未开始';
+  }, [chartDetail?.status]);
+
+  const stopPolling = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = undefined;
     }
-    // 当开始提交，把submitting设置为true
-    setSubmitting(true);
+  };
 
-      // 对接后端，上传数据
-      const params = {
-        ...values,
-        file: undefined,
-      };
-      try {
-        // 需要取到上传的原始数据file→file→originFileObj(原始数据)
-        const res = await genChartByAiAsyncMqUsingPOST(params, {}, values.file.file.originFileObj);
-        // 正常情况下，如果没有返回值就分析失败，有，就分析成功
-        if (!res?.data) {
-          message.error('分析失败');
-        } else {
-          message.success('分析任务提交成功，稍后请在我的图表页面查看');  
-          // 重置所有字段
-          form.resetFields();
-        }  
-      // 异常情况下，提示分析失败+具体失败原因
-      } catch (e: any) {
-        message.error('分析失败,' + e.message);
+  const fetchChartDetail = async (id: number) => {
+    try {
+      const res = await getChartByIdUsingGET({ id });
+      if (res?.data) {
+        setChartDetail(res.data);
+        if (res.data.status === 'succeed' || res.data.status === 'failed') {
+          stopPolling();
+          if (res.data.status === 'succeed') {
+            message.success('图表生成完成啦，主人可以直接查看结果 ✨');
+          }
+        }
       }
-      // 当结束提交，把submitting设置为false
+    } catch (e: any) {
+      message.error('获取任务状态失败：' + e.message);
+      stopPolling();
+    }
+  };
+
+  const startPolling = (id: number) => {
+    stopPolling();
+    // 先立即查一次
+    fetchChartDetail(id);
+    timerRef.current = setInterval(() => {
+      fetchChartDetail(id);
+    }, 2500);
+  };
+
+  useEffect(() => {
+    return () => stopPolling();
+  }, []);
+
+  const onFinish = async (values: any) => {
+    if (submitting) return;
+    setSubmitting(true);
+    setChartId(undefined);
+    setChartDetail(undefined);
+    stopPolling();
+
+    const params = {
+      ...values,
+      file: undefined,
+    };
+
+    try {
+      const res = await genChartByAiAsyncMqUsingPOST(params, {}, values.file.file.originFileObj);
+      if (!res?.data?.chartId) {
+        message.error('分析任务提交失败');
+        return;
+      }
+      const id = res.data.chartId;
+      setChartId(id);
+      message.success(`任务已提交（#${id}），已自动进入状态追踪`);
+      form.resetFields();
+      startPolling(id);
+    } catch (e: any) {
+      message.error('分析失败,' + e.message);
+    } finally {
       setSubmitting(false);
-    };  
+    }
+  };
+
+  const renderResult = () => {
+    if (!chartDetail) {
+      return <Alert type="info" showIcon message="提交任务后，这里会实时展示排队/执行状态和结果" />;
+    }
+
+    if (chartDetail.status === 'wait' || chartDetail.status === 'running') {
+      return (
+        <Result
+          status="info"
+          title={statusText}
+          subTitle={chartDetail.execMessage || '系统正在努力分析中，请稍候...'}
+          extra={<Button onClick={() => chartId && fetchChartDetail(chartId)}>立即刷新</Button>}
+        />
+      );
+    }
+
+    if (chartDetail.status === 'failed') {
+      return <Result status="error" title="分析失败" subTitle={chartDetail.execMessage || '请更换数据后重试'} />;
+    }
+
+    let option: any = {};
+    try {
+      option = JSON.parse((chartDetail.genChart || '{}').replace(/'/g, '"'));
+    } catch (e) {
+      option = {};
+    }
+
+    return (
+      <>
+        <Descriptions bordered column={1} size="small" style={{ marginBottom: 16 }}>
+          <Descriptions.Item label="任务ID">{chartDetail.id}</Descriptions.Item>
+          <Descriptions.Item label="状态">{statusText}</Descriptions.Item>
+          <Descriptions.Item label="分析目标">{chartDetail.goal || '-'}</Descriptions.Item>
+        </Descriptions>
+        <Card type="inner" title="分析结论" style={{ marginBottom: 16 }}>
+          {chartDetail.genResult || '暂无'}
+        </Card>
+        <Card type="inner" title="可视化结果">
+          <ReactECharts option={option} />
+        </Card>
+      </>
+    );
+  };
 
   return (
     <div className="add-chart-async">
-      <Card title="智能分析">
-            <Form
-            form={form}
-            name="addChart"
-            labelAlign="left" 
-            labelCol={{ span: 4 }}
-            wrapperCol={{ span: 16 }}
-            onFinish={onFinish}
-            initialValues={{  }}
-            >
-            <Form.Item name="goal" label="分析目标" rules={[{ required: true, message: '请输入分析目标!' }]}>
-                <TextArea placeholder="请输入你的分析需求，比如：分析网站用户的增长情况 （每次消耗1积分）"/>
-            </Form.Item>
+      <Card title="智能分析（异步 MQ）" extra={chartId ? `当前任务 #${chartId}` : undefined}>
+        <Form
+          form={form}
+          name="addChart"
+          labelAlign="left"
+          labelCol={{ span: 4 }}
+          wrapperCol={{ span: 16 }}
+          onFinish={onFinish}
+          initialValues={{}}
+        >
+          <Form.Item name="goal" label="分析目标" rules={[{ required: true, message: '请输入分析目标!' }]}>
+            <TextArea placeholder="请输入你的分析需求，比如：分析网站用户的增长情况（每次消耗1积分）" />
+          </Form.Item>
 
-            <Form.Item name="name" label="图表名称">
-                <Input placeholder="请输入图表名称" />
-            </Form.Item>
+          <Form.Item name="name" label="图表名称">
+            <Input placeholder="请输入图表名称" />
+          </Form.Item>
 
-            <Form.Item
-              name="chartType"
-              label="图表类型"
-              >
-              <Select
+          <Form.Item name="chartType" label="图表类型">
+            <Select
               options={[
                 { value: '折线图', label: '折线图' },
                 { value: '柱状图', label: '柱状图' },
@@ -83,28 +166,32 @@ const AddChartAsync: React.FC = () => {
                 { value: '饼图', label: '饼图' },
                 { value: '雷达图', label: '雷达图' },
               ]}
-              />
-            </Form.Item>
+            />
+          </Form.Item>
 
-            <Form.Item
-                name="file"
-                label="原始数据"
-              >
-                <Upload name="file" maxCount={1}>
-                  <Button icon={<UploadOutlined />}>上传 CSV 文件后缀要为.xlsx</Button>
-                </Upload>
-              </Form.Item>
-              <Form.Item wrapperCol={{ span: 16, offset: 4 }}>
-                <Space>
-                  <Button type="primary" htmlType="submit" loading={submitting} disabled={submitting}>
-                    提交
-                  </Button>
-                  <Button htmlType="reset">重置</Button>
-                </Space>
-              </Form.Item>
-            </Form>
-          </Card>
+          <Form.Item
+            name="file"
+            label="原始数据"
+            rules={[{ required: true, message: '请上传数据文件（xlsx）' }]}
+          >
+            <Upload name="file" maxCount={1}>
+              <Button icon={<UploadOutlined />}>上传文件（后缀 .xlsx / .xls）</Button>
+            </Upload>
+          </Form.Item>
+          <Form.Item wrapperCol={{ span: 16, offset: 4 }}>
+            <Space>
+              <Button type="primary" htmlType="submit" loading={submitting} disabled={submitting}>
+                提交并追踪
+              </Button>
+              <Button htmlType="reset">重置</Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </Card>
+
+      <div style={{ marginTop: 16 }}>{renderResult()}</div>
     </div>
   );
 };
+
 export default AddChartAsync;
