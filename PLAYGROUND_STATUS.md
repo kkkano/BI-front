@@ -4,12 +4,12 @@
 
 ## 自动心跳（Auto)
 <<<<<<< HEAD
-- Auto ping: **2026-02-22 19:41 CST (UTC+8)**
+- Auto ping: **2026-02-22 19:43 CST (UTC+8)**
 =======
-- Auto ping: **2026-02-22 19:41 CST (UTC+8)**
+- Auto ping: **2026-02-22 19:43 CST (UTC+8)**
 >>>>>>> 91fd23f (chore(status): manual refresh board heartbeat)
-- Latest commit: **0b8d1bc**
-- Message: **feat(MyChart): pending charts auto-poll refresh**
+- Latest commit: **6599d20**
+- Message: **feat(MyChart): avoid overlapping 5s polling refresh requests**
 
 ## 当前阶段
 - **Phase 2 / 4：前后端任务追踪联动（进行中）**
