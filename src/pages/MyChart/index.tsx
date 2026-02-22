@@ -259,12 +259,19 @@ const MyChartPage: React.FC = () => {
                   </>
                 )}
                 {item.status === 'failed' && (
-                  <Result
-                    status="error"
-                    title="图表生成失败"
-                    subTitle={item.execMessage ?? '请更换数据后重试'}
-                    style={{ padding: '16px 0' }}
-                  />
+                  <>
+                    <Result
+                      status="error"
+                      title="图表生成失败"
+                      subTitle="请根据失败原因调整后重试"
+                      style={{ padding: '16px 0 8px' }}
+                    />
+                    <Card type="inner" size="small" title="失败原因">
+                      <Text type="danger" style={{ whiteSpace: 'pre-wrap' }}>
+                        {item.execMessage ?? '暂无详细错误信息，请稍后重试'}
+                      </Text>
+                    </Card>
+                  </>
                 )}
               </Card>
             </List.Item>
