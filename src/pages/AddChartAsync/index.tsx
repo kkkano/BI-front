@@ -1,4 +1,4 @@
-import { genChartByAiUsingPOST, getChartTaskStatusUsingGET } from '@/services/yubi/chartController';
+import { genChartByAiAsyncUsingPOST, getChartTaskStatusUsingGET } from '@/services/yubi/chartController';
 import { UploadOutlined } from '@ant-design/icons';
 import {
   Alert,
@@ -27,9 +27,16 @@ type TaskEvent = {
   at: string;
 };
 
+const STATUS_TEXT: Record<string, string> = {
+  wait: '排队中',
+  running: '分析中',
+  succeed: '分析完成',
+  failed: '分析失败',
+};
+
 /**
- * 添加图表(异步)页面 + Agent式进度追踪
- * 提交后自动轮询 /api/chart/task/status，每 30 秒一次，最多 20 次
+ * 添加图表(异步线程池)页面 + Agent式进度追踪
+ * 轮询策略：30 秒一次，最多 20 次；连续失败 10 次停止追踪
  */
 const AddChartAsync: React.FC = () => {
   const [form] = useForm();
@@ -45,14 +52,10 @@ const AddChartAsync: React.FC = () => {
   const POLL_INTERVAL_MS = 30 * 1000;
   const MAX_RETRY = 20;
 
-  const statusText = useMemo(() => {
-    const status = chartDetail?.status;
-    if (status === 'wait') return '排队中';
-    if (status === 'running') return '分析中';
-    if (status === 'succeed') return '分析完成';
-    if (status === 'failed') return '分析失败';
-    return '未开始';
-  }, [chartDetail?.status]);
+  const statusText = useMemo(
+    () => STATUS_TEXT[chartDetail?.status ?? ''] ?? '未开始',
+    [chartDetail?.status],
+  );
 
   const stopPolling = () => {
     if (timerRef.current) {
@@ -84,13 +87,11 @@ const AddChartAsync: React.FC = () => {
         errorCountRef.current = 0;
         setChartDetail(res.data);
         if (res.data.status) {
-          addEvent(res.data.status, res.data.execMessage || statusText || '状态更新');
+          addEvent(res.data.status, res.data.execMessage || STATUS_TEXT[res.data.status] || '状态更新');
         }
         if (res.data.status === 'succeed' || res.data.status === 'failed') {
           stopPolling();
-          if (res.data.status === 'succeed') {
-            message.success('图表生成完成！');
-          }
+          if (res.data.status === 'succeed') message.success('图表生成完成！');
           return;
         }
         if (pollCountRef.current >= MAX_RETRY) {
@@ -129,7 +130,7 @@ const AddChartAsync: React.FC = () => {
 
     const params = { ...values, file: undefined };
     try {
-      const res = await genChartByAiUsingPOST(params, {}, values.file.file.originFileObj);
+      const res = await genChartByAiAsyncUsingPOST(params, {}, values.file.file.originFileObj);
       if (!res?.data) {
         message.error('分析失败，未获取到任务信息');
         return;
@@ -154,7 +155,13 @@ const AddChartAsync: React.FC = () => {
 
   const renderResult = () => {
     if (!chartDetail) {
-      return <Alert type="info" showIcon message="提交任务后，这里会展示排队/执行状态和结果（每 30 秒自动刷新）" />;
+      return (
+        <Alert
+          type="info"
+          showIcon
+          message="提交任务后，这里会展示排队/执行状态和结果（每 30 秒自动刷新）"
+        />
+      );
     }
     if (chartDetail.status === 'wait' || chartDetail.status === 'running') {
       return (
@@ -167,7 +174,9 @@ const AddChartAsync: React.FC = () => {
       );
     }
     if (chartDetail.status === 'failed') {
-      return <Result status="error" title="分析失败" subTitle={chartDetail.execMessage || '请更换数据后重试'} />;
+      return (
+        <Result status="error" title="分析失败" subTitle={chartDetail.execMessage || '请更换数据后重试'} />
+      );
     }
     let option: any = {};
     try {
@@ -175,9 +184,20 @@ const AddChartAsync: React.FC = () => {
     } catch (_) {}
     return (
       <>
-        <Descriptions bordered column={1} size="small" style={{ marginBottom: 16 }}>
+        <Descriptions bordered column={2} size="small" style={{ marginBottom: 16 }}>
           <Descriptions.Item label="任务ID">{chartDetail.chartId}</Descriptions.Item>
           <Descriptions.Item label="状态">{statusText}</Descriptions.Item>
+          {chartDetail.name && (
+            <Descriptions.Item label="图表名称">{chartDetail.name}</Descriptions.Item>
+          )}
+          {chartDetail.chartType && (
+            <Descriptions.Item label="图表类型">{chartDetail.chartType}</Descriptions.Item>
+          )}
+          {chartDetail.goal && (
+            <Descriptions.Item label="分析目标" span={2}>
+              {chartDetail.goal}
+            </Descriptions.Item>
+          )}
         </Descriptions>
         <Card type="inner" title="分析结论" style={{ marginBottom: 16 }}>
           {chartDetail.genResult || '暂无'}
@@ -201,7 +221,7 @@ const AddChartAsync: React.FC = () => {
 
   return (
     <div className="add-chart-async">
-      <Card title="智能分析（异步）" extra={chartId ? `当前任务 #${chartId}` : undefined}>
+      <Card title="智能分析（异步线程池）" extra={chartId ? `当前任务 #${chartId}` : undefined}>
         <Form
           form={form}
           name="addChart"
@@ -219,6 +239,8 @@ const AddChartAsync: React.FC = () => {
           </Form.Item>
           <Form.Item name="chartType" label="图表类型">
             <Select
+              placeholder="请选择图表类型（可选）"
+              allowClear
               options={[
                 { value: '折线图', label: '折线图' },
                 { value: '柱状图', label: '柱状图' },
@@ -229,8 +251,8 @@ const AddChartAsync: React.FC = () => {
             />
           </Form.Item>
           <Form.Item name="file" label="原始数据" rules={[{ required: true, message: '请上传数据文件' }]}>
-            <Upload name="file" maxCount={1}>
-              <Button icon={<UploadOutlined />}>上传 CSV 文件（后缀 .xlsx）</Button>
+            <Upload name="file" maxCount={1} accept=".xlsx,.xls,.csv">
+              <Button icon={<UploadOutlined />}>上传文件（.xlsx / .xls / .csv）</Button>
             </Upload>
           </Form.Item>
           <Form.Item wrapperCol={{ span: 16, offset: 4 }}>
