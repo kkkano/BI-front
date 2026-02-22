@@ -1,6 +1,20 @@
 import { deleteChartUsingPOST, listMyChartByPageUsingPOST } from '@/services/yubi/chartController';
 import { useModel } from '@@/exports';
-import { Avatar, Button, Card, Col, List, message, Popconfirm, Result, Row, Space, Tag, Typography } from 'antd';
+import {
+  Avatar,
+  Button,
+  Card,
+  Col,
+  List,
+  message,
+  Modal,
+  Popconfirm,
+  Result,
+  Row,
+  Space,
+  Tag,
+  Typography,
+} from 'antd';
 import ReactECharts from 'echarts-for-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Search from 'antd/es/input/Search';
@@ -53,6 +67,7 @@ const MyChartPage: React.FC = () => {
   const [total, setTotal] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
   const [deletingId, setDeletingId] = useState<number | undefined>();
+  const [previewChart, setPreviewChart] = useState<{ title: string; option: object } | null>(null);
   const pollingRequestingRef = useRef(false);
 
   const hasPendingCharts = useMemo(
@@ -153,6 +168,10 @@ const MyChartPage: React.FC = () => {
         locale={{ emptyText: '暂无图表，快去生成一个吧！' }}
         renderItem={(item) => {
           const statusCfg = STATUS_CONFIG[item.status ?? ''];
+          const parsedChartOption =
+            item.status === 'succeed' && item.genChart && isValidJson(item.genChart)
+              ? safeParseChart(item.genChart)
+              : undefined;
           return (
             <List.Item key={item.id}>
               <Card
@@ -250,11 +269,32 @@ const MyChartPage: React.FC = () => {
                         <Text>{item.genResult}</Text>
                       </Card>
                     )}
-                    {item.genChart && isValidJson(item.genChart) && (
-                      <ReactECharts
-                        option={safeParseChart(item.genChart)}
-                        style={{ height: 280 }}
-                      />
+                    {parsedChartOption && (
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        style={{ cursor: 'zoom-in' }}
+                        onClick={() =>
+                          setPreviewChart({
+                            title: item.name || '未命名图表',
+                            option: parsedChartOption,
+                          })
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setPreviewChart({
+                              title: item.name || '未命名图表',
+                              option: parsedChartOption,
+                            });
+                          }
+                        }}
+                      >
+                        <ReactECharts option={parsedChartOption} style={{ height: 280 }} />
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                          点击图表可放大查看
+                        </Text>
+                      </div>
                     )}
                   </>
                 )}
@@ -278,6 +318,22 @@ const MyChartPage: React.FC = () => {
           );
         }}
       />
+
+      <Modal
+        open={!!previewChart}
+        title={previewChart?.title}
+        footer={null}
+        width="80vw"
+        onCancel={() => setPreviewChart(null)}
+        destroyOnClose
+      >
+        {previewChart && (
+          <ReactECharts
+            option={previewChart.option}
+            style={{ height: '60vh', minHeight: 420 }}
+          />
+        )}
+      </Modal>
     </div>
   );
 };
