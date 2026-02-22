@@ -1,8 +1,8 @@
 import { deleteChartUsingPOST, listMyChartByPageUsingPOST } from '@/services/yubi/chartController';
 import { useModel } from '@@/exports';
-import { Avatar, Button, Card, Col, List, message, Modal, Popconfirm, Result, Row, Space, Tag, Typography } from 'antd';
+import { Avatar, Button, Card, Col, List, message, Popconfirm, Result, Row, Space, Tag, Typography } from 'antd';
 import ReactECharts from 'echarts-for-react';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Search from 'antd/es/input/Search';
 
 const { Text } = Typography;
@@ -13,6 +13,8 @@ const STATUS_CONFIG: Record<string, { color: string; label: string }> = {
   succeed: { color: 'success', label: '已完成' },
   failed: { color: 'error', label: '生成失败' },
 };
+
+const POLLING_INTERVAL = 5000;
 
 const isValidJson = (str: string): boolean => {
   try {
@@ -52,25 +54,50 @@ const MyChartPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [deletingId, setDeletingId] = useState<number | undefined>();
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const res = await listMyChartByPageUsingPOST(searchParams);
-      if (res.data) {
-        setChartList(res.data.records ?? []);
-        setTotal(res.data.total ?? 0);
-      } else {
-        message.error('获取我的图表失败');
+  const hasPendingCharts = useMemo(
+    () => chartList.some((chart) => chart.status === 'wait' || chart.status === 'running'),
+    [chartList],
+  );
+
+  const loadData = useCallback(
+    async (silent = false) => {
+      if (!silent) {
+        setLoading(true);
       }
-    } catch (e: any) {
-      message.error('获取我的图表失败，' + e.message);
-    }
-    setLoading(false);
-  };
+      try {
+        const res = await listMyChartByPageUsingPOST(searchParams);
+        if (res.data) {
+          setChartList(res.data.records ?? []);
+          setTotal(res.data.total ?? 0);
+        } else if (!silent) {
+          message.error('获取我的图表失败');
+        }
+      } catch (e: any) {
+        if (!silent) {
+          message.error('获取我的图表失败，' + e.message);
+        }
+      } finally {
+        if (!silent) {
+          setLoading(false);
+        }
+      }
+    },
+    [searchParams],
+  );
 
   useEffect(() => {
     loadData();
-  }, [searchParams]);
+  }, [loadData]);
+
+  useEffect(() => {
+    if (!hasPendingCharts) {
+      return;
+    }
+    const timer = window.setInterval(() => {
+      loadData(true);
+    }, POLLING_INTERVAL);
+    return () => window.clearInterval(timer);
+  }, [hasPendingCharts, loadData]);
 
   const handleDeleteChart = async (id: number) => {
     setDeletingId(id);
