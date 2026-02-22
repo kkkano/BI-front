@@ -2,7 +2,7 @@ import { deleteChartUsingPOST, listMyChartByPageUsingPOST } from '@/services/yub
 import { useModel } from '@@/exports';
 import { Avatar, Button, Card, Col, List, message, Popconfirm, Result, Row, Space, Tag, Typography } from 'antd';
 import ReactECharts from 'echarts-for-react';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Search from 'antd/es/input/Search';
 
 const { Text } = Typography;
@@ -53,6 +53,7 @@ const MyChartPage: React.FC = () => {
   const [total, setTotal] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
   const [deletingId, setDeletingId] = useState<number | undefined>();
+  const pollingRequestingRef = useRef(false);
 
   const hasPendingCharts = useMemo(
     () => chartList.some((chart) => chart.status === 'wait' || chart.status === 'running'),
@@ -61,7 +62,12 @@ const MyChartPage: React.FC = () => {
 
   const loadData = useCallback(
     async (silent = false) => {
-      if (!silent) {
+      if (silent && pollingRequestingRef.current) {
+        return;
+      }
+      if (silent) {
+        pollingRequestingRef.current = true;
+      } else {
         setLoading(true);
       }
       try {
@@ -77,7 +83,9 @@ const MyChartPage: React.FC = () => {
           message.error('获取我的图表失败，' + e.message);
         }
       } finally {
-        if (!silent) {
+        if (silent) {
+          pollingRequestingRef.current = false;
+        } else {
           setLoading(false);
         }
       }
