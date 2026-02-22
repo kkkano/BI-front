@@ -4,12 +4,12 @@
 
 ## 自动心跳（Auto)
 <<<<<<< HEAD
-- Auto ping: **2026-02-22 16:26 CST (UTC+8)**
+- Auto ping: **2026-02-22 16:40 CST (UTC+8)**
 =======
-- Auto ping: **2026-02-22 16:26 CST (UTC+8)**
+- Auto ping: **2026-02-22 16:40 CST (UTC+8)**
 >>>>>>> 91fd23f (chore(status): manual refresh board heartbeat)
-- Latest commit: **e204892**
-- Message: **feat: ChartTaskStatusVO 补全 name/goal/chartType 类型，结果页展示图表元信息**
+- Latest commit: **76952e0**
+- Message: **feat: AddChartAsync 结果页补齐 name/goal/chartType 展示，优化 Select 和 Upload 体验**
 
 ## 当前阶段
 - **Phase 2 / 4：前后端任务追踪联动（进行中）**
