@@ -3,9 +3,13 @@
 > 自动更新规则：每次推送到 `feat/agentic-playground`，会自动刷新下面 3 行（中国时间）。
 
 ## 自动心跳（Auto)
-- Auto ping: **2026-02-22 02:29 CST (UTC+8)**
-- Latest commit: **ba65a6e**
-- Message: **feat(agentic): add task timeline panel for async tracking**
+<<<<<<< HEAD
+- Auto ping: **2026-02-22 08:39 CST (UTC+8)**
+=======
+- Auto ping: **2026-02-22 08:39 CST (UTC+8)**
+>>>>>>> 91fd23f (chore(status): manual refresh board heartbeat)
+- Latest commit: **16bf006**
+- Message: **chore(status): auto refresh playground board [skip ci]**
 
 ## 当前阶段
 - **Phase 2 / 4：前后端任务追踪联动（进行中）**
