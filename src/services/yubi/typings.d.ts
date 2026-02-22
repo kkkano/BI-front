@@ -127,6 +127,9 @@ declare namespace API {
 
   type ChartTaskStatusVO = {
     chartId?: number;
+    name?: string;
+    goal?: string;
+    chartType?: string;
     execMessage?: string;
     genChart?: string;
     genResult?: string;

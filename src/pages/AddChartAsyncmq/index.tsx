@@ -199,6 +199,9 @@ const AddChartAsync: React.FC = () => {
       <>
         <Descriptions bordered column={1} size="small" style={{ marginBottom: 16 }}>
           <Descriptions.Item label="任务ID">{chartDetail.chartId}</Descriptions.Item>
+          {chartDetail.name && <Descriptions.Item label="图表名称">{chartDetail.name}</Descriptions.Item>}
+          {chartDetail.goal && <Descriptions.Item label="分析目标">{chartDetail.goal}</Descriptions.Item>}
+          {chartDetail.chartType && <Descriptions.Item label="图表类型">{chartDetail.chartType}</Descriptions.Item>}
           <Descriptions.Item label="状态">{statusText}</Descriptions.Item>
         </Descriptions>
         <Card type="inner" title="分析结论" style={{ marginBottom: 16 }}>
