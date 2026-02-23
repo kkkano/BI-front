@@ -352,14 +352,29 @@ const AddChartAsync: React.FC = () => {
       }
 
       const res = await genChartByAiAsyncMqUsingPOST(params, {}, originFile);
-      if (!res?.data?.chartId) {
+      const biResponse = res?.data;
+      if (!biResponse?.chartId) {
         message.error('分析任务提交失败');
         return;
       }
 
-      const id = res.data.chartId;
+      const id = biResponse.chartId;
+      const initialStatus = biResponse.status || 'wait';
       setChartId(id);
+      setChartDetail({
+        chartId: id,
+        name: biResponse.name,
+        goal: biResponse.goal,
+        chartType: biResponse.chartType,
+        status: initialStatus,
+        execMessage: biResponse.execMessage,
+        createTime: biResponse.createTime,
+        updateTime: biResponse.updateTime,
+      });
       addEvent('submitted', `任务 #${id} 已提交，系统已开启自动追踪（每 30 秒刷新）`);
+      if (biResponse.execMessage) {
+        addEvent(initialStatus, biResponse.execMessage);
+      }
       message.success(`分析任务提交成功（#${id}），正在自动追踪状态`);
       form.resetFields();
       startPolling(id);

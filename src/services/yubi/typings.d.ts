@@ -96,8 +96,15 @@ declare namespace API {
 
   type BiResponse = {
     chartId?: number;
+    name?: string;
+    goal?: string;
+    chartType?: string;
+    status?: string;
+    execMessage?: string;
     genChart?: string;
     genResult?: string;
+    createTime?: string;
+    updateTime?: string;
   };
 
   type Chart = {

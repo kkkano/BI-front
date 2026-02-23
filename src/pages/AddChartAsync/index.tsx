@@ -284,15 +284,32 @@ const AddChartAsync: React.FC = () => {
       }
 
       const res = await genChartByAiAsyncUsingPOST(params, {}, originFile);
-      const id = res?.data?.chartId;
+      const biResponse = res?.data;
+      const id = biResponse?.chartId;
       if (!id) {
         message.error('分析任务提交失败');
         return;
       }
 
+      const initialStatus = toTaskStatus(biResponse?.status || 'wait');
+      const initialExecMessage = biResponse?.execMessage || '';
       setChartId(id);
-      setStatus('wait');
+      setStatus(initialStatus);
+      setExecMessage(initialExecMessage);
+      setChartDetail({
+        chartId: id,
+        name: biResponse?.name,
+        goal: biResponse?.goal,
+        chartType: biResponse?.chartType,
+        status: biResponse?.status || 'wait',
+        execMessage: biResponse?.execMessage,
+        createTime: biResponse?.createTime,
+        updateTime: biResponse?.updateTime,
+      });
       addEvent('submitted', `任务 #${id} 已提交，系统正在自动追踪执行进度`);
+      if (initialExecMessage) {
+        addEvent(initialStatus, initialExecMessage);
+      }
       message.success(`分析任务提交成功（#${id}），正在自动追踪状态`);
       form.resetFields();
       startPolling(id);
