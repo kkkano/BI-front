@@ -14,6 +14,7 @@ import {
   Row,
   Space,
   Tag,
+  Tooltip,
   Typography,
 } from 'antd';
 import ReactECharts from 'echarts-for-react';
@@ -35,6 +36,13 @@ const PREVIEW_HINT_TEXT: Record<string, string> = {
   wait: '图表排队中，状态更新后可预览',
   running: '图表生成中，完成后可点击预览',
   failed: '图表生成失败，请修复后重新生成',
+};
+
+const STATUS_TOOLTIP_TEXT: Record<string, string> = {
+  wait: '任务已进入队列，等待系统开始处理',
+  running: '任务正在执行，页面会自动刷新状态',
+  succeed: '图表与分析结论已生成完成',
+  failed: '生成异常，建议查看失败原因后修复重试',
 };
 
 const statusToResultStatus = (status?: string): 'warning' | 'info' | 'success' | 'error' => {
@@ -67,6 +75,13 @@ const safeParseChart = (raw: string | undefined): object => {
   } catch {
     return {};
   }
+};
+
+const truncateText = (text: string, maxLength = 120): string => {
+  if (text.length <= maxLength) {
+    return text;
+  }
+  return `${text.slice(0, maxLength)}...`;
 };
 
 /**
@@ -271,7 +286,11 @@ const MyChartPage: React.FC = () => {
                     </Col>
                     {statusCfg && (
                       <Col flex="none">
-                        <Tag color={statusCfg.color}>{statusCfg.label}</Tag>
+                        <Tooltip title={STATUS_TOOLTIP_TEXT[item.status ?? '']}>
+                          <Tag color={statusCfg.color} style={{ marginRight: 0 }}>
+                            {statusCfg.label}
+                          </Tag>
+                        </Tooltip>
                       </Col>
                     )}
                   </Row>
@@ -371,12 +390,28 @@ const MyChartPage: React.FC = () => {
                     />
                     <Card type="inner" size="small" title="失败原因" style={{ marginBottom: 8 }}>
                       <Text type="danger" style={{ whiteSpace: 'pre-wrap' }}>
-                        {item.execMessage ?? '暂无详细错误信息，请稍后重试'}
+                        {item.execMessage
+                          ? truncateText(item.execMessage, 160)
+                          : '暂无详细错误信息，请稍后重试'}
                       </Text>
+                      {item.execMessage && item.execMessage.length > 160 && (
+                        <div style={{ marginTop: 8 }}>
+                          <Tooltip title={item.execMessage}>
+                            <Button type="link" size="small" style={{ padding: 0 }}>
+                              查看完整错误
+                            </Button>
+                          </Tooltip>
+                        </div>
+                      )}
                     </Card>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                      {PREVIEW_HINT_TEXT.failed}
-                    </Text>
+                    <Space size={6} wrap>
+                      <Tag color="error" bordered={false}>
+                        无法预览
+                      </Tag>
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        {PREVIEW_HINT_TEXT.failed}
+                      </Text>
+                    </Space>
                   </>
                 )}
               </Card>
@@ -393,6 +428,9 @@ const MyChartPage: React.FC = () => {
         onCancel={() => setPreviewChart(null)}
         destroyOnClose
       >
+        <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
+          鼠标滚轮可缩放页面，便于查看细节
+        </Text>
         {previewChart && (
           <ReactECharts
             option={previewChart.option}
