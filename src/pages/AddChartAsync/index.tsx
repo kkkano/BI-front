@@ -21,8 +21,10 @@ import {
   Typography,
   Upload,
 } from 'antd';
+import type { UploadProps } from 'antd';
 import { useForm } from 'antd/es/form/Form';
 import TextArea from 'antd/es/input/TextArea';
+import type { EChartsOption } from 'echarts';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ReactECharts from 'echarts-for-react';
 import { history } from '@umijs/max';
@@ -39,6 +41,103 @@ type TaskEvent = {
   at: string;
 };
 
+type TaskStatus = 'idle' | 'wait' | 'running' | 'succeed' | 'failed';
+type PollSource = 'auto' | 'manual';
+
+type AddChartFormValues = {
+  goal: string;
+  name?: string;
+  chartType?: string;
+  file?: {
+    file?: {
+      originFileObj?: File;
+    };
+    fileList?: {
+      originFileObj?: File;
+    }[];
+  };
+};
+
+const EVENT_TAG_COLOR: Record<string, string> = {
+  submitted: 'blue',
+  retry: 'cyan',
+  wait: 'default',
+  running: 'processing',
+  succeed: 'success',
+  failed: 'error',
+  warning: 'warning',
+  timeout: 'warning',
+  error: 'error',
+  empty: 'warning',
+};
+
+const EVENT_TAG_LABEL: Record<string, string> = {
+  submitted: '已提交',
+  retry: '恢复追踪',
+  wait: '排队中',
+  running: '执行中',
+  succeed: '已完成',
+  failed: '执行失败',
+  warning: '查询告警',
+  timeout: '追踪超时',
+  error: '查询失败',
+  empty: '返回为空',
+};
+
+const isTerminalTaskStatus = (
+  status?: string,
+): status is Extract<TaskStatus, 'succeed' | 'failed'> =>
+  status === 'succeed' || status === 'failed';
+
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  if (typeof error === 'string' && error.trim()) {
+    return error;
+  }
+  return '未知错误';
+};
+
+const toTaskStatus = (status?: string): TaskStatus => {
+  if (status === 'wait' || status === 'running' || status === 'succeed' || status === 'failed') {
+    return status;
+  }
+  return 'running';
+};
+
+const getUploadFile = (fileField?: AddChartFormValues['file']): File | undefined =>
+  fileField?.file?.originFileObj || fileField?.fileList?.[0]?.originFileObj;
+
+const parseChartOption = (genChart?: string): EChartsOption | null => {
+  if (!genChart) {
+    return null;
+  }
+
+  const payload = genChart.trim();
+  if (!payload) {
+    return null;
+  }
+
+  for (const candidate of [payload, payload.replace(/'/g, '"')]) {
+    try {
+      const parsed: unknown = JSON.parse(candidate);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as EChartsOption;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
+};
+
+const hasUsableOption = (option: EChartsOption | null): option is EChartsOption =>
+  !!option && Object.keys(option as Record<string, unknown>).length > 0;
+
+const getCurrentTime = (): string => new Date().toLocaleTimeString('zh-CN', { hour12: false });
+
 /**
  * 添加图表（异步 线程池）页面
  * 优化点：
@@ -51,7 +150,7 @@ const AddChartAsync: React.FC = () => {
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [chartId, setChartId] = useState<number>();
   const [chartDetail, setChartDetail] = useState<API.ChartTaskStatusVO>();
-  const [status, setStatus] = useState<string>('idle');
+  const [status, setStatus] = useState<TaskStatus>('idle');
   const [execMessage, setExecMessage] = useState<string>('');
   const [events, setEvents] = useState<TaskEvent[]>([]);
   const [countdown, setCountdown] = useState<number>(0);
@@ -60,10 +159,10 @@ const AddChartAsync: React.FC = () => {
   const [lastPolledAt, setLastPolledAt] = useState<string>('');
   const [manualRefreshing, setManualRefreshing] = useState<boolean>(false);
   const [pollTimeoutReached, setPollTimeoutReached] = useState<boolean>(false);
-  const [lastSubmitValues, setLastSubmitValues] = useState<any>();
+  const [lastSubmitValues, setLastSubmitValues] = useState<AddChartFormValues>();
 
-  const timerRef = useRef<NodeJS.Timeout>();
-  const countdownTimerRef = useRef<NodeJS.Timeout>();
+  const timerRef = useRef<ReturnType<typeof setInterval>>();
+  const countdownTimerRef = useRef<ReturnType<typeof setInterval>>();
   const pollCountRef = useRef<number>(0);
   const consecutiveErrorRef = useRef<number>(0);
 
@@ -73,7 +172,7 @@ const AddChartAsync: React.FC = () => {
 
   const statusText = useMemo(() => getTaskStatusText(status), [status]);
 
-  const isTerminalStatus = status === 'succeed' || status === 'failed';
+  const isTerminalStatus = isTerminalTaskStatus(status);
 
   const progressPercent = useMemo(() => {
     if (status === 'succeed' || status === 'failed') return 100;
@@ -95,13 +194,12 @@ const AddChartAsync: React.FC = () => {
     return '系统正在处理中，请稍候';
   }, [chartId, execMessage, pollError, pollTimeoutReached, status]);
 
-  const getEventTagColor = (eventStatus: string): string => {
-    if (eventStatus === 'failed' || eventStatus === 'error' || eventStatus === 'timeout')
-      return 'error';
-    if (eventStatus === 'warning' || eventStatus === 'empty') return 'warning';
-    if (eventStatus === 'succeed') return 'success';
-    if (eventStatus === 'running') return 'processing';
-    return 'default';
+  const beforeUpload: UploadProps['beforeUpload'] = (file) => {
+    if (!/\.(xlsx|xls|csv)$/i.test(file.name)) {
+      message.error('仅支持 .xlsx / .xls / .csv 文件');
+      return Upload.LIST_IGNORE;
+    }
+    return false;
   };
 
   const addEvent = (eventStatus: string, text: string) => {
@@ -154,7 +252,7 @@ const AddChartAsync: React.FC = () => {
     return () => stopPolling();
   }, []);
 
-  const doFetchChartStatus = async (id: number, source: 'auto' | 'manual' = 'auto') => {
+  const doFetchChartStatus = async (id: number, source: PollSource = 'auto') => {
     if (source === 'auto' && pollCountRef.current >= MAX_RETRY) {
       const timeoutMessage =
         '自动追踪超时：已达到最大查询次数。你可以重试自动追踪，或稍后在“我的图表”查看最终结果';
@@ -176,7 +274,7 @@ const AddChartAsync: React.FC = () => {
     try {
       const res = await getChartTaskStatusUsingGET({ chartId: id });
       const data = res?.data;
-      setLastPolledAt(new Date().toLocaleTimeString('zh-CN', { hour12: false }));
+      setLastPolledAt(getCurrentTime());
 
       if (!data) {
         const emptyMessage = '状态查询成功，但未返回任务详情，请稍后重试';
@@ -185,33 +283,38 @@ const AddChartAsync: React.FC = () => {
         return;
       }
 
+      const nextStatus = toTaskStatus(data.status);
+      const nextExecMessage = data.execMessage || '';
+
       consecutiveErrorRef.current = 0;
       setChartDetail(data);
-      setStatus(data.status || 'running');
-      setExecMessage(data.execMessage || '');
+      setStatus(nextStatus);
+      setExecMessage(nextExecMessage);
       setPollError('');
 
       if (data.status) {
         const eventText =
           data.status === 'failed'
-            ? buildFailureHint(data.execMessage)
-            : data.execMessage || getTaskStatusText(data.status);
+            ? buildFailureHint(nextExecMessage)
+            : nextExecMessage || getTaskStatusText(data.status);
         addEvent(data.status, eventText);
       }
 
-      if (data.status === 'succeed') {
+      if (nextStatus === 'succeed') {
         stopPolling();
         message.success('图表分析完成，可前往“我的图表”查看');
         return;
       }
 
-      if (data.status === 'failed') {
+      if (nextStatus === 'failed') {
         stopPolling();
-        setPollError(buildFailureHint(data.execMessage));
+        setPollError(buildFailureHint(nextExecMessage));
       }
-    } catch (e: any) {
+    } catch (error: unknown) {
       consecutiveErrorRef.current += 1;
-      const errMsg = e?.message || '未知错误';
+      setLastPolledAt(getCurrentTime());
+
+      const errMsg = getErrorMessage(error);
       const errorMessage =
         consecutiveErrorRef.current >= MAX_CONSECUTIVE_ERRORS
           ? '状态查询连续失败次数过多，已暂停自动追踪，请稍后手动刷新'
@@ -222,6 +325,7 @@ const AddChartAsync: React.FC = () => {
       if (consecutiveErrorRef.current >= MAX_CONSECUTIVE_ERRORS) {
         stopPolling();
         addEvent('error', errorMessage);
+        message.error(errorMessage);
       } else {
         addEvent('warning', errorMessage);
       }
@@ -257,8 +361,9 @@ const AddChartAsync: React.FC = () => {
     message.success('已恢复自动追踪，请稍候查看最新状态');
   };
 
-  const onFinish = async (values: any) => {
+  const onFinish = async (values: AddChartFormValues) => {
     if (submitting) return;
+
     setLastSubmitValues(values);
     setSubmitting(true);
     setChartId(undefined);
@@ -270,30 +375,37 @@ const AddChartAsync: React.FC = () => {
     stopPolling();
     resetPollingMeta();
 
-    const params = { ...values, file: undefined };
+    const params: API.genChartByAiAsyncUsingPOSTParams = {
+      goal: values.goal,
+      name: values.name,
+      chartType: values.chartType,
+    };
+
     try {
-      const originFile = values?.file?.file?.originFileObj;
+      const originFile = getUploadFile(values.file);
       if (!originFile) {
         message.error('请上传数据文件');
-        setSubmitting(false);
         return;
       }
+
       const res = await genChartByAiAsyncUsingPOST(params, {}, originFile);
       const id = res?.data?.chartId;
       if (!id) {
         message.error('分析任务提交失败');
-      } else {
-        setChartId(id);
-        setStatus('wait');
-        addEvent('submitted', `任务 #${id} 已提交，系统正在自动追踪执行进度`);
-        message.success(`分析任务提交成功（#${id}），正在自动追踪状态`);
-        form.resetFields();
-        startPolling(id);
+        return;
       }
-    } catch (e: any) {
-      message.error('分析失败，' + buildFailureHint(e.message));
+
+      setChartId(id);
+      setStatus('wait');
+      addEvent('submitted', `任务 #${id} 已提交，系统正在自动追踪执行进度`);
+      message.success(`分析任务提交成功（#${id}），正在自动追踪状态`);
+      form.resetFields();
+      startPolling(id);
+    } catch (error: unknown) {
+      message.error('分析失败，' + buildFailureHint(getErrorMessage(error)));
+    } finally {
+      setSubmitting(false);
     }
-    setSubmitting(false);
   };
 
   const onRetryLastSubmit = () => {
@@ -303,12 +415,7 @@ const AddChartAsync: React.FC = () => {
 
   const renderResult = () => {
     if (status === 'succeed') {
-      let option: any = {};
-      try {
-        option = JSON.parse((chartDetail?.genChart || '{}').replace(/'/g, '"'));
-      } catch (e) {
-        option = {};
-      }
+      const option = parseChartOption(chartDetail?.genChart);
 
       return (
         <>
@@ -329,7 +436,7 @@ const AddChartAsync: React.FC = () => {
             {chartDetail?.genResult || '暂无'}
           </Card>
           <Card type="inner" title="可视化结果">
-            {Object.keys(option).length > 0 ? (
+            {hasUsableOption(option) ? (
               <ReactECharts option={option} />
             ) : (
               <Alert
@@ -428,8 +535,12 @@ const AddChartAsync: React.FC = () => {
   const timelineItems = events.map((event) => ({
     title: (
       <Space>
-        <Tag color={getEventTagColor(event.status)}>{event.status}</Tag>
-        <span>{event.text}</span>
+        <Tag color={EVENT_TAG_COLOR[event.status] || 'default'}>
+          {EVENT_TAG_LABEL[event.status] || event.status}
+        </Tag>
+        <Typography.Text ellipsis={{ tooltip: event.text }} style={{ maxWidth: 520 }}>
+          {event.text}
+        </Typography.Text>
       </Space>
     ),
     description: event.at,
@@ -470,10 +581,10 @@ const AddChartAsync: React.FC = () => {
           <Form.Item
             name="file"
             label="原始数据"
-            rules={[{ required: true, message: '请上传数据文件!' }]}
+            rules={[{ required: true, message: '请上传数据文件（xlsx / xls / csv）' }]}
           >
-            <Upload name="file" maxCount={1} accept=".xlsx,.csv">
-              <Button icon={<UploadOutlined />}>上传数据文件（.xlsx）</Button>
+            <Upload name="file" maxCount={1} accept=".xlsx,.xls,.csv" beforeUpload={beforeUpload}>
+              <Button icon={<UploadOutlined />}>上传数据文件（.xlsx / .xls / .csv）</Button>
             </Upload>
           </Form.Item>
           <Form.Item wrapperCol={{ span: 16, offset: 4 }}>
