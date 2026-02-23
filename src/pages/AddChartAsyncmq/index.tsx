@@ -1,4 +1,7 @@
-import { genChartByAiAsyncMqUsingPOST, getChartTaskStatusUsingGET } from '@/services/yubi/chartController';
+import {
+  genChartByAiAsyncMqUsingPOST,
+  getChartTaskStatusUsingGET,
+} from '@/services/yubi/chartController';
 import { UploadOutlined } from '@ant-design/icons';
 import {
   Alert,
@@ -14,6 +17,7 @@ import {
   Space,
   Steps,
   Tag,
+  Typography,
   Upload,
 } from 'antd';
 import type { UploadProps } from 'antd';
@@ -21,8 +25,14 @@ import { useForm } from 'antd/es/form/Form';
 import TextArea from 'antd/es/input/TextArea';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ReactECharts from 'echarts-for-react';
+import { history } from '@umijs/max';
 import TaskProgressPanel from './components/TaskProgressPanel';
-import { buildFailureHint, getTaskStatusText } from '../AddChartAsync/statusCopy';
+import {
+  buildFailureHint,
+  getFailureDetailText,
+  getFailureReasonSummary,
+  getTaskStatusText,
+} from '../AddChartAsync/statusCopy';
 
 type TaskEvent = {
   status: string;
@@ -84,6 +94,7 @@ const AddChartAsync: React.FC = () => {
   const [pollCount, setPollCount] = useState<number>(0);
   const [lastPolledAt, setLastPolledAt] = useState<string>('');
   const [pollError, setPollError] = useState<string>('');
+  const [lastSubmitValues, setLastSubmitValues] = useState<AddChartFormValues>();
 
   const timerRef = useRef<NodeJS.Timeout>();
   const countdownTimerRef = useRef<NodeJS.Timeout>();
@@ -158,7 +169,11 @@ const AddChartAsync: React.FC = () => {
 
   const addEvent = (status: string, text: string) => {
     setEvents((prev) => {
-      if (prev.length > 0 && prev[prev.length - 1].status === status && prev[prev.length - 1].text === text) {
+      if (
+        prev.length > 0 &&
+        prev[prev.length - 1].status === status &&
+        prev[prev.length - 1].text === text
+      ) {
         return prev;
       }
       return [
@@ -174,7 +189,8 @@ const AddChartAsync: React.FC = () => {
 
   const fetchChartDetail = async (id: number, source: 'auto' | 'manual' = 'auto') => {
     if (source === 'auto' && pollCountRef.current >= MAX_RETRY) {
-      const timeoutMessage = '自动追踪超时：已达到最大查询次数。你可以重试自动追踪，或稍后在“我的图表”查看最终结果';
+      const timeoutMessage =
+        '自动追踪超时：已达到最大查询次数。你可以重试自动追踪，或稍后在“我的图表”查看最终结果';
       stopPolling();
       setPollTimeoutReached(true);
       setPollError(timeoutMessage);
@@ -273,6 +289,7 @@ const AddChartAsync: React.FC = () => {
   const onFinish = async (values: AddChartFormValues) => {
     if (submitting) return;
 
+    setLastSubmitValues(values);
     setSubmitting(true);
     setChartId(undefined);
     setChartDetail(undefined);
@@ -287,7 +304,8 @@ const AddChartAsync: React.FC = () => {
     };
 
     try {
-      const originFile = values?.file?.file?.originFileObj || values?.file?.fileList?.[0]?.originFileObj;
+      const originFile =
+        values?.file?.file?.originFileObj || values?.file?.fileList?.[0]?.originFileObj;
       if (!originFile) {
         message.error('请上传数据文件');
         return;
@@ -312,9 +330,16 @@ const AddChartAsync: React.FC = () => {
     }
   };
 
+  const onRetryLastSubmit = () => {
+    if (!lastSubmitValues || submitting) return;
+    onFinish(lastSubmitValues);
+  };
+
   const renderResult = () => {
     if (!chartDetail) {
-      return <Alert type={pollError ? 'warning' : 'info'} showIcon message={pollError || hintText} />;
+      return (
+        <Alert type={pollError ? 'warning' : 'info'} showIcon message={pollError || hintText} />
+      );
     }
 
     if (chartDetail.status === 'wait' || chartDetail.status === 'running') {
@@ -339,30 +364,84 @@ const AddChartAsync: React.FC = () => {
     }
 
     if (chartDetail.status === 'failed') {
-      return <Result status="error" title={statusText} subTitle={buildFailureHint(chartDetail.execMessage)} />;
+      const failureSummary = getFailureReasonSummary(chartDetail.execMessage);
+      const failureDetail = getFailureDetailText(chartDetail.execMessage);
+
+      return (
+        <Result
+          status="error"
+          title={statusText}
+          subTitle="任务已结束，请根据失败摘要修正后重新提交"
+          extra={
+            <Space direction="vertical" size={12} style={{ width: 520, maxWidth: '100%' }}>
+              <Alert
+                type="error"
+                showIcon
+                message={
+                  failureSummary
+                    ? `失败摘要：${failureSummary}`
+                    : buildFailureHint(chartDetail.execMessage)
+                }
+              />
+              {failureDetail ? (
+                <Typography.Paragraph
+                  copyable
+                  ellipsis={{ rows: 2, expandable: true, symbol: '展开详情' }}
+                >
+                  {failureDetail}
+                </Typography.Paragraph>
+              ) : null}
+              <Space wrap>
+                {lastSubmitValues ? (
+                  <Button type="primary" loading={submitting} onClick={onRetryLastSubmit}>
+                    一键重试上次参数
+                  </Button>
+                ) : null}
+                <Button onClick={() => history.push('/my_chart')}>去我的图表查看</Button>
+              </Space>
+            </Space>
+          }
+        />
+      );
     }
 
     let option: any = {};
+    let parseFailed = false;
     try {
       option = JSON.parse((chartDetail.genChart || '{}').replace(/'/g, '"'));
     } catch (e) {
       option = {};
+      parseFailed = true;
     }
 
     return (
       <>
         <Descriptions bordered column={1} size="small" style={{ marginBottom: 16 }}>
           <Descriptions.Item label="任务ID">{chartDetail.chartId}</Descriptions.Item>
-          {chartDetail.name && <Descriptions.Item label="图表名称">{chartDetail.name}</Descriptions.Item>}
-          {chartDetail.goal && <Descriptions.Item label="分析目标">{chartDetail.goal}</Descriptions.Item>}
-          {chartDetail.chartType && <Descriptions.Item label="图表类型">{chartDetail.chartType}</Descriptions.Item>}
+          {chartDetail.name && (
+            <Descriptions.Item label="图表名称">{chartDetail.name}</Descriptions.Item>
+          )}
+          {chartDetail.goal && (
+            <Descriptions.Item label="分析目标">{chartDetail.goal}</Descriptions.Item>
+          )}
+          {chartDetail.chartType && (
+            <Descriptions.Item label="图表类型">{chartDetail.chartType}</Descriptions.Item>
+          )}
           <Descriptions.Item label="状态">{statusText}</Descriptions.Item>
         </Descriptions>
         <Card type="inner" title="分析结论" style={{ marginBottom: 16 }}>
           {chartDetail.genResult || '暂无'}
         </Card>
         <Card type="inner" title="可视化结果">
-          <ReactECharts option={option} />
+          {parseFailed || Object.keys(option).length === 0 ? (
+            <Alert
+              type="warning"
+              showIcon
+              message="图表配置解析失败，请前往“我的图表”查看原始结果"
+            />
+          ) : (
+            <ReactECharts option={option} />
+          )}
         </Card>
       </>
     );
@@ -371,7 +450,9 @@ const AddChartAsync: React.FC = () => {
   const timelineItems = events.map((event) => ({
     title: (
       <Space>
-        <Tag color={EVENT_TAG_COLOR[event.status] || 'default'}>{EVENT_TAG_LABEL[event.status] || event.status}</Tag>
+        <Tag color={EVENT_TAG_COLOR[event.status] || 'default'}>
+          {EVENT_TAG_LABEL[event.status] || event.status}
+        </Tag>
         <span>{event.text}</span>
       </Space>
     ),
@@ -390,7 +471,11 @@ const AddChartAsync: React.FC = () => {
           onFinish={onFinish}
           initialValues={{}}
         >
-          <Form.Item name="goal" label="分析目标" rules={[{ required: true, message: '请输入分析目标!' }]}>
+          <Form.Item
+            name="goal"
+            label="分析目标"
+            rules={[{ required: true, message: '请输入分析目标!' }]}
+          >
             <TextArea placeholder="请输入你的分析需求，比如：分析网站用户的增长情况（每次消耗1积分）" />
           </Form.Item>
 

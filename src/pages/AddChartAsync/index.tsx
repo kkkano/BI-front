@@ -18,13 +18,20 @@ import {
   Space,
   Steps,
   Tag,
+  Typography,
   Upload,
 } from 'antd';
 import { useForm } from 'antd/es/form/Form';
 import TextArea from 'antd/es/input/TextArea';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ReactECharts from 'echarts-for-react';
-import { buildFailureHint, getTaskStatusText } from './statusCopy';
+import { history } from '@umijs/max';
+import {
+  buildFailureHint,
+  getFailureDetailText,
+  getFailureReasonSummary,
+  getTaskStatusText,
+} from './statusCopy';
 
 type TaskEvent = {
   status: string;
@@ -337,17 +344,40 @@ const AddChartAsync: React.FC = () => {
     }
 
     if (status === 'failed') {
+      const failureSummary = getFailureReasonSummary(execMessage);
+      const failureDetail = getFailureDetailText(execMessage);
+
       return (
         <Result
           status="error"
           title={statusText}
-          subTitle={buildFailureHint(execMessage)}
+          subTitle="任务已结束，请根据失败摘要修正后重新提交"
           extra={
-            lastSubmitValues ? (
-              <Button type="primary" loading={submitting} onClick={onRetryLastSubmit}>
-                一键重试上次参数
-              </Button>
-            ) : undefined
+            <Space direction="vertical" size={12} style={{ width: 520, maxWidth: '100%' }}>
+              <Alert
+                type="error"
+                showIcon
+                message={
+                  failureSummary ? `失败摘要：${failureSummary}` : buildFailureHint(execMessage)
+                }
+              />
+              {failureDetail ? (
+                <Typography.Paragraph
+                  copyable
+                  ellipsis={{ rows: 2, expandable: true, symbol: '展开详情' }}
+                >
+                  {failureDetail}
+                </Typography.Paragraph>
+              ) : null}
+              <Space wrap>
+                {lastSubmitValues ? (
+                  <Button type="primary" loading={submitting} onClick={onRetryLastSubmit}>
+                    一键重试上次参数
+                  </Button>
+                ) : null}
+                <Button onClick={() => history.push('/my_chart')}>去我的图表查看</Button>
+              </Space>
+            </Space>
           }
         />
       );
