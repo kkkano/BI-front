@@ -84,6 +84,22 @@ const EVENT_TAG_LABEL: Record<string, string> = {
   empty: '返回为空',
 };
 
+const TASK_PHASE_LABELS: Record<API.ChartTaskPhaseEnum, string> = {
+  created: '任务已创建',
+  status_running_updated: '状态更新为执行中',
+  ai_generating: 'AI 正在生成结果',
+  ai_result_parsed: 'AI 结果解析完成',
+  result_persisting: '正在持久化分析结果',
+  result_succeed_updated: '状态更新为成功',
+  finished: '任务处理完成',
+  failed: '任务执行失败',
+};
+
+const getTaskPhaseText = (taskPhase?: API.ChartTaskPhaseEnum): string => {
+  if (!taskPhase) return '待开始';
+  return TASK_PHASE_LABELS[taskPhase] || taskPhase;
+};
+
 const isTerminalTaskStatus = (
   status?: string,
 ): status is Extract<TaskStatus, 'succeed' | 'failed'> =>
@@ -220,6 +236,10 @@ const AddChartAsync: React.FC = () => {
   });
 
   const statusText = useMemo(() => getTaskStatusText(status), [status]);
+  const taskPhaseText = useMemo(
+    () => getTaskPhaseText(chartDetail?.taskPhase),
+    [chartDetail?.taskPhase],
+  );
   const isTerminalStatus = isTerminalTaskStatus(status);
 
   const progressPercent = useMemo(() => {
@@ -302,6 +322,7 @@ const AddChartAsync: React.FC = () => {
         goal: biResponse?.goal,
         chartType: biResponse?.chartType,
         status: biResponse?.status || 'wait',
+        taskPhase: biResponse?.taskPhase,
         execMessage: biResponse?.execMessage,
         createTime: biResponse?.createTime,
         updateTime: biResponse?.updateTime,
@@ -343,6 +364,7 @@ const AddChartAsync: React.FC = () => {
               <Descriptions.Item label="图表类型">{chartDetail.chartType}</Descriptions.Item>
             ) : null}
             <Descriptions.Item label="状态">{statusText}</Descriptions.Item>
+            <Descriptions.Item label="执行阶段">{taskPhaseText}</Descriptions.Item>
           </Descriptions>
           <Card type="inner" title="分析结论" style={{ marginBottom: 16 }}>
             {chartDetail?.genResult || '暂无'}
@@ -516,7 +538,7 @@ const AddChartAsync: React.FC = () => {
             type={pollError ? 'warning' : 'info'}
             showIcon
             style={{ marginBottom: 12 }}
-            message={`任务 #${chartId} · 当前状态：${statusText}`}
+            message={`任务 #${chartId} · 当前状态：${statusText} · 当前阶段：${taskPhaseText}`}
             description={`轮询进度 ${pollCount}/${MAX_RETRY}${!isTerminalStatus ? `，预计 ${countdown}s 后自动刷新` : ''}${lastPolledAt ? `，最近查询 ${lastPolledAt}` : ''}`}
           />
           {events.length === 0 ? (

@@ -94,12 +94,26 @@ declare namespace API {
     message?: string;
   };
 
+  type ChartTaskPhaseEnum =
+    | 'created'
+    | 'status_running_updated'
+    | 'ai_generating'
+    | 'ai_result_parsed'
+    | 'result_persisting'
+    | 'result_succeed_updated'
+    | 'finished'
+    | 'failed';
+
   type BiResponse = {
     chartId?: number;
     name?: string;
     goal?: string;
     chartType?: string;
     status?: string;
+    taskPhase?: ChartTaskPhaseEnum;
+    traceId?: string;
+    failureCode?: string;
+    failureTime?: string;
     execMessage?: string;
     genChart?: string;
     genResult?: string;
@@ -112,6 +126,8 @@ declare namespace API {
     chartType?: string;
     createTime?: string;
     execMessage?: string;
+    failureCode?: string;
+    failureTime?: string;
     genChart?: string;
     genResult?: string;
     goal?: string;
@@ -119,6 +135,8 @@ declare namespace API {
     isDelete?: number;
     name?: string;
     status?: string;
+    taskPhase?: ChartTaskPhaseEnum;
+    traceId?: string;
     updateTime?: string;
     userId?: number;
   };
@@ -147,6 +165,10 @@ declare namespace API {
     name?: string;
     goal?: string;
     chartType?: string;
+    taskPhase?: ChartTaskPhaseEnum;
+    traceId?: string;
+    failureCode?: string;
+    failureTime?: string;
     execMessage?: string;
     genChart?: string;
     genResult?: string;
