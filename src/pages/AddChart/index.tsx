@@ -1,8 +1,10 @@
 import { genChartByAiUsingPOST } from '@/services/yubi/chartController';
 import {
+  CHART_UPLOAD_FILE_ACCEPT,
   getErrorMessage,
   getUploadFile,
   parseChartOption,
+  validateChartUploadFile,
   type UploadFieldValue,
 } from '@/utils/chart';
 import { UploadOutlined } from '@ant-design/icons';
@@ -25,6 +27,7 @@ import {
   Typography,
   Upload,
 } from 'antd';
+import type { UploadProps } from 'antd';
 import { useForm } from 'antd/es/form/Form';
 import TextArea from 'antd/es/input/TextArea';
 import type { EChartsOption } from 'echarts';
@@ -79,6 +82,24 @@ const AddChart: React.FC = () => {
   const [previewOpen, setPreviewOpen] = useState<boolean>(false);
   const [loadingStageIndex, setLoadingStageIndex] = useState<number>(0);
 
+  const beforeUpload: UploadProps['beforeUpload'] = (file) => {
+    const validationMessage = validateChartUploadFile(file);
+    if (validationMessage) {
+      message.error(validationMessage);
+      return Upload.LIST_IGNORE;
+    }
+    return false;
+  };
+
+  const onReset = () => {
+    form.resetFields();
+    setChart(undefined);
+    setChartOption(undefined);
+    setSubmitMeta(undefined);
+    setPreviewOpen(false);
+    setLoadingStageIndex(0);
+  };
+
   const onFinish = async (values: AddChartFormValues) => {
     if (submitting) return;
 
@@ -100,8 +121,9 @@ const AddChart: React.FC = () => {
 
     try {
       const originFile = getUploadFile(values.file);
-      if (!originFile) {
-        message.error('请上传数据文件');
+      const validationMessage = validateChartUploadFile(originFile);
+      if (validationMessage) {
+        message.error(validationMessage);
         return;
       }
 
@@ -164,8 +186,13 @@ const AddChart: React.FC = () => {
                 label="原始数据"
                 rules={[{ required: true, message: '请上传数据文件!' }]}
               >
-                <Upload name="file" maxCount={1} accept=".xlsx,.csv" beforeUpload={() => false}>
-                  <Button icon={<UploadOutlined />}>上传数据文件（.xlsx / .csv）</Button>
+                <Upload
+                  name="file"
+                  maxCount={1}
+                  accept={CHART_UPLOAD_FILE_ACCEPT}
+                  beforeUpload={beforeUpload}
+                >
+                  <Button icon={<UploadOutlined />}>上传数据文件（.xlsx / .xls / .csv）</Button>
                 </Upload>
               </Form.Item>
 
@@ -179,7 +206,7 @@ const AddChart: React.FC = () => {
                   >
                     提交分析
                   </Button>
-                  <Button htmlType="reset" disabled={submitting}>
+                  <Button onClick={onReset} disabled={submitting}>
                     重置
                   </Button>
                 </Space>

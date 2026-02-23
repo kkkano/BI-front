@@ -4,10 +4,12 @@ import {
   getChartTaskStatusUsingGET,
 } from '@/services/yubi/chartController';
 import {
+  CHART_UPLOAD_FILE_ACCEPT,
   getErrorMessage,
   getUploadFile,
   hasUsableOption,
   parseChartOption,
+  validateChartUploadFile,
   type UploadFieldValue,
 } from '@/utils/chart';
 import { UploadOutlined } from '@ant-design/icons';
@@ -413,8 +415,9 @@ const AddChartAsync: React.FC = () => {
   }, [chartDetail?.status]);
 
   const beforeUpload: UploadProps['beforeUpload'] = (file) => {
-    if (!/\.(xlsx|xls|csv)$/i.test(file.name)) {
-      message.error('仅支持 .xlsx / .xls / .csv 文件');
+    const validationMessage = validateChartUploadFile(file);
+    if (validationMessage) {
+      message.error(validationMessage);
       return Upload.LIST_IGNORE;
     }
     return false;
@@ -444,8 +447,9 @@ const AddChartAsync: React.FC = () => {
 
     try {
       const originFile = getUploadFile(values.file);
-      if (!originFile) {
-        message.error('请上传数据文件');
+      const validationMessage = validateChartUploadFile(originFile);
+      if (validationMessage) {
+        message.error(validationMessage);
         return;
       }
 
@@ -679,7 +683,12 @@ const AddChartAsync: React.FC = () => {
             label="原始数据"
             rules={[{ required: true, message: '请上传数据文件（xlsx / xls / csv）' }]}
           >
-            <Upload name="file" maxCount={1} accept=".xlsx,.xls,.csv" beforeUpload={beforeUpload}>
+            <Upload
+              name="file"
+              maxCount={1}
+              accept={CHART_UPLOAD_FILE_ACCEPT}
+              beforeUpload={beforeUpload}
+            >
               <Button icon={<UploadOutlined />}>上传文件（后缀 .xlsx / .xls / .csv）</Button>
             </Upload>
           </Form.Item>

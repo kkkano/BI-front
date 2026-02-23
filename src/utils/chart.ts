@@ -51,6 +51,27 @@ export const getErrorMessage = (error: unknown, fallback = '未知错误'): stri
 export const getUploadFile = (fileField?: UploadFieldValue): File | undefined =>
   fileField?.file?.originFileObj ?? fileField?.fileList?.[0]?.originFileObj;
 
+const CHART_UPLOAD_FILE_NAME_REGEX = /\.(xlsx|xls|csv)$/i;
+
+export const CHART_UPLOAD_FILE_ACCEPT = '.xlsx,.xls,.csv';
+export const MAX_CHART_UPLOAD_FILE_SIZE = 1024 * 1024;
+
+export const validateChartUploadFile = (file?: Pick<File, 'name' | 'size'>): string | undefined => {
+  if (!file) {
+    return '请上传数据文件';
+  }
+
+  if (!isNonEmptyString(file.name) || !CHART_UPLOAD_FILE_NAME_REGEX.test(file.name)) {
+    return '仅支持 .xlsx / .xls / .csv 文件';
+  }
+
+  if (typeof file.size === 'number' && file.size > MAX_CHART_UPLOAD_FILE_SIZE) {
+    return '文件大小不能超过 1MB';
+  }
+
+  return undefined;
+};
+
 const extractCodeFencePayload = (payload: string): string | undefined => {
   const match = payload.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
   const fencedContent = match?.[1]?.trim();
@@ -97,7 +118,9 @@ const buildParseCandidates = (payload: string): string[] => {
     normalizedCandidates.push(candidate.replace(/'/g, '"'));
   });
 
-  return Array.from(new Set(normalizedCandidates.map((candidate) => candidate.trim()).filter(Boolean)));
+  return Array.from(
+    new Set(normalizedCandidates.map((candidate) => candidate.trim()).filter(Boolean)),
+  );
 };
 
 export const parseChartOption = <T extends object>(raw?: string): T | null => {

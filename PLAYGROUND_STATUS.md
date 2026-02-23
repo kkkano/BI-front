@@ -3,15 +3,13 @@
 > 自动更新规则：每次推送到 `feat/agentic-playground`，会自动刷新下面 3 行（中国时间）。
 
 ## 自动心跳（Auto)
-<<<<<<< HEAD
+
 - Auto ping: **2026-02-23 16:27 CST (UTC+8)**
-=======
-- Auto ping: **2026-02-23 16:27 CST (UTC+8)**
->>>>>>> 91fd23f (chore(status): manual refresh board heartbeat)
 - Latest commit: **97a6abb**
 - Message: **refactor(async-mq): guard stale polling responses and simplify progress panel**
 
 ## 当前阶段
+
 - **Phase 2 / 4：前后端任务追踪联动（进行中）**
 
 ## 进度总览
@@ -23,11 +21,13 @@
 - [ ] P4 Agent 调试面板（最近任务、重试记录、失败原因）
 
 ## 仓库与分支
+
 - BI: `https://github.com/kkkano/BI` @ `feat/agentic-playground`
 - BI-front: `https://github.com/kkkano/BI-front` @ `feat/agentic-playground`
 
 ---
 
 ## Changelog
+
 - 2026-02-21 15:20 UTC: 创建状态看板
 - 2026-02-22 00:18 CST: 看板时间切换为中国时区（UTC+8）
