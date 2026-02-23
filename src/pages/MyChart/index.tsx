@@ -29,6 +29,7 @@ import ReactECharts from 'echarts-for-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Search from 'antd/es/input/Search';
 import type { ECharts, EChartsOption } from 'echarts';
+import { history } from '@umijs/max';
 
 const { Text } = Typography;
 const FAILURE_REASON_COLLAPSE_KEY = 'failure-reason';
@@ -194,10 +195,43 @@ const MyChartPage: React.FC = () => {
     }
 
     if (searchParams.name) {
-      return '未找到匹配图表，试试其他关键词';
+      return (
+        <Space direction="vertical" size={8} align="center">
+          <Text type="secondary">未找到匹配图表，试试其他关键词</Text>
+          <Button
+            size="small"
+            onClick={() =>
+              setSearchParams((prev) => ({
+                ...prev,
+                current: 1,
+                name: undefined,
+              }))
+            }
+          >
+            清空关键词
+          </Button>
+        </Space>
+      );
     }
 
-    return '暂无图表，快去生成一个吧！';
+    return (
+      <Empty
+        image={Empty.PRESENTED_IMAGE_SIMPLE}
+        description={
+          <Space direction="vertical" size={4} align="center">
+            <Text strong>还没有生成图表</Text>
+            <Text type="secondary">先创建一个分析任务，结果会自动同步到这里</Text>
+          </Space>
+        }
+      >
+        <Space wrap>
+          <Button type="primary" onClick={() => history.push('/add_chart_async')}>
+            去创建图表
+          </Button>
+          <Button onClick={() => history.push('/add_chart')}>快速分析（同步）</Button>
+        </Space>
+      </Empty>
+    );
   }, [chartList.length, searchParams.name, statusFilter]);
 
   useEffect(() => {
