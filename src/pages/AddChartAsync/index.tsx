@@ -80,6 +80,10 @@ const AddChartAsync: React.FC = () => {
     setLastPolledAt('');
   };
 
+  const resetCountdown = () => {
+    setCountdown(POLL_INTERVAL_MS / 1000);
+  };
+
   useEffect(() => {
     return () => stopPolling();
   }, []);
@@ -89,6 +93,11 @@ const AddChartAsync: React.FC = () => {
       stopPolling();
       setPollError('自动追踪次数已达上限，请稍后在“我的图表”页面查看结果');
       return;
+    }
+
+    if (source === 'manual') {
+      setManualRefreshing(true);
+      resetCountdown();
     }
 
     pollCountRef.current += 1;
@@ -130,18 +139,22 @@ const AddChartAsync: React.FC = () => {
         stopPolling();
         setPollError('状态查询连续失败次数过多，已暂停自动追踪，请稍后手动刷新');
       }
+    } finally {
+      if (source === 'manual') {
+        setManualRefreshing(false);
+      }
     }
   };
 
   const startPolling = (id: number) => {
     stopPolling();
     resetPollingMeta();
-    setCountdown(POLL_INTERVAL_MS / 1000);
+    resetCountdown();
 
     doFetchChartStatus(id);
 
     timerRef.current = setInterval(() => {
-      setCountdown(POLL_INTERVAL_MS / 1000);
+      resetCountdown();
       doFetchChartStatus(id);
     }, POLL_INTERVAL_MS);
 
@@ -242,10 +255,18 @@ const AddChartAsync: React.FC = () => {
                   status={status === 'failed' ? 'exception' : status === 'succeed' ? 'success' : 'active'}
                 />
                 <Space wrap>
-                  <Button onClick={() => chartId && doFetchChartStatus(chartId, 'manual')} disabled={isTerminalStatus}>
+                  <Button
+                    onClick={() => chartId && doFetchChartStatus(chartId, 'manual')}
+                    loading={manualRefreshing}
+                    disabled={isTerminalStatus || manualRefreshing}
+                  >
                     立即刷新
                   </Button>
-                  {!isTerminalStatus ? <Tag color="blue">下次刷新：{countdown}s</Tag> : null}
+                  {!isTerminalStatus ? (
+                    <Tag color={countdown <= 3 ? 'orange' : 'blue'}>
+                      下次自动刷新：{manualRefreshing ? '同步中...' : `${countdown}s`}
+                    </Tag>
+                  ) : null}
                   <Tag color="processing">已查询：{pollCount}/{MAX_RETRY}</Tag>
                   {lastPolledAt ? <Tag>最近查询：{lastPolledAt}</Tag> : null}
                 </Space>
