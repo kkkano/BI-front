@@ -51,6 +51,8 @@ type TaskEvent = {
 
 type TaskStatus = 'wait' | 'running' | 'succeed' | 'failed';
 
+type AgentStepStatus = 'wait' | 'process' | 'finish' | 'error';
+
 type AddChartFormValues = {
   goal: string;
   name?: string;
@@ -296,6 +298,87 @@ const AddChartAsync: React.FC = () => {
     pollError,
     pollPausedByError,
     pollTimeoutReached,
+  ]);
+
+  const stageItems = useMemo(() => {
+    const status = chartDetail?.status;
+    const failureSummary =
+      status === 'failed' ? getFailureReasonSummary(chartDetail?.execMessage) : '';
+
+    const submitStatus: AgentStepStatus = chartId ? 'finish' : submitting ? 'process' : 'wait';
+    const queueStatus: AgentStepStatus = !chartId
+      ? 'wait'
+      : status === 'wait'
+        ? 'process'
+        : status
+          ? 'finish'
+          : 'process';
+    const analyzeStatus: AgentStepStatus = !chartId
+      ? 'wait'
+      : status === 'running'
+        ? 'process'
+        : status === 'succeed' || status === 'failed'
+          ? 'finish'
+          : 'wait';
+    const deliverStatus: AgentStepStatus = !chartId
+      ? 'wait'
+      : status === 'succeed'
+        ? 'finish'
+        : status === 'failed'
+          ? 'error'
+          : pollPausedByError || pollTimeoutReached
+            ? 'process'
+            : 'wait';
+
+    return [
+      {
+        title: '提交任务',
+        status: submitStatus,
+        description: chartId
+          ? `任务 #${chartId} 已创建`
+          : submitting
+            ? '正在提交任务'
+            : '等待提交分析任务',
+      },
+      {
+        title: '排队调度',
+        status: queueStatus,
+        description: !chartId
+          ? '未进入队列'
+          : status === 'wait'
+            ? '等待可用计算资源'
+            : '调度完成',
+      },
+      {
+        title: '执行分析',
+        status: analyzeStatus,
+        description:
+          status === 'running'
+            ? 'AI 正在生成图表与结论'
+            : status === 'succeed' || status === 'failed'
+              ? '分析阶段已结束'
+              : '等待进入执行阶段',
+      },
+      {
+        title: '结果回传',
+        status: deliverStatus,
+        description:
+          status === 'succeed'
+            ? '结果已返回，可查看图表'
+            : status === 'failed'
+              ? failureSummary || '分析失败，请查看失败原因'
+              : pollPausedByError || pollTimeoutReached
+                ? '回传受阻，可手动恢复追踪'
+                : '等待执行结果',
+      },
+    ];
+  }, [
+    chartDetail?.execMessage,
+    chartDetail?.status,
+    chartId,
+    pollPausedByError,
+    pollTimeoutReached,
+    submitting,
   ]);
 
   const progressPercent = useMemo(() => {
@@ -582,6 +665,7 @@ const AddChartAsync: React.FC = () => {
             description={`轮询进度 ${pollCount}/${MAX_RETRY}${!isTerminalStatus ? `，预计 ${countdown}s 后自动刷新` : ''}${lastPolledAt ? `，最近查询 ${lastPolledAt}` : ''}`}
           />
         ) : null}
+        <Steps size="small" responsive items={stageItems} style={{ marginBottom: 12 }} />
         {events.length === 0 ? (
           <Alert type="info" showIcon message="任务开始后会自动记录执行轨迹" />
         ) : (
