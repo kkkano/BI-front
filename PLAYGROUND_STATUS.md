@@ -4,12 +4,12 @@
 
 ## 自动心跳（Auto)
 <<<<<<< HEAD
-- Auto ping: **2026-02-23 15:05 CST (UTC+8)**
+- Auto ping: **2026-02-23 16:14 CST (UTC+8)**
 =======
-- Auto ping: **2026-02-23 15:05 CST (UTC+8)**
+- Auto ping: **2026-02-23 16:14 CST (UTC+8)**
 >>>>>>> 91fd23f (chore(status): manual refresh board heartbeat)
-- Latest commit: **3ab43c0**
-- Message: **refactor: unify chart parsing and error handling helpers**
+- Latest commit: **29981ac**
+- Message: **feat(ui): improve async chart tracking recovery UX**
 
 ## 当前阶段
 - **Phase 2 / 4：前后端任务追踪联动（进行中）**
