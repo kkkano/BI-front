@@ -10,13 +10,39 @@ export type UploadFieldValue = {
 const isObject = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 
+const isNonEmptyString = (value: unknown): value is string =>
+  typeof value === 'string' && value.trim().length > 0;
+
+const pickFirstString = (...values: unknown[]): string | undefined => {
+  for (const value of values) {
+    if (isNonEmptyString(value)) {
+      return value.trim();
+    }
+  }
+  return undefined;
+};
+
 export const getErrorMessage = (error: unknown, fallback = '未知错误'): string => {
-  if (error instanceof Error && error.message) {
+  if (error instanceof Error && isNonEmptyString(error.message)) {
     return error.message;
   }
 
-  if (typeof error === 'string' && error.trim()) {
-    return error;
+  if (isNonEmptyString(error)) {
+    return error.trim();
+  }
+
+  if (isObject(error)) {
+    const data = isObject(error.data) ? error.data : undefined;
+    const message = pickFirstString(
+      error.message,
+      error.msg,
+      error.errorMessage,
+      data?.message,
+      data?.msg,
+    );
+    if (message) {
+      return message;
+    }
   }
 
   return fallback;
@@ -24,6 +50,55 @@ export const getErrorMessage = (error: unknown, fallback = '未知错误'): stri
 
 export const getUploadFile = (fileField?: UploadFieldValue): File | undefined =>
   fileField?.file?.originFileObj ?? fileField?.fileList?.[0]?.originFileObj;
+
+const extractCodeFencePayload = (payload: string): string | undefined => {
+  const match = payload.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  const fencedContent = match?.[1]?.trim();
+  return fencedContent || undefined;
+};
+
+const extractObjectPayload = (payload: string): string | undefined => {
+  const start = payload.indexOf('{');
+  const end = payload.lastIndexOf('}');
+  if (start === -1 || end <= start) {
+    return undefined;
+  }
+
+  const objectPayload = payload.slice(start, end + 1).trim();
+  return objectPayload || undefined;
+};
+
+const normalizeSingleQuotedJson = (payload: string): string =>
+  payload
+    .replace(/([{,]\s*)'([^'\\]+?)'(\s*:)/g, '$1"$2"$3')
+    .replace(
+      /(:\s*)'([^'\\]*(?:\\.[^'\\]*)*)'(\s*[,}])/g,
+      (_match, prefix: string, rawValue: string, suffix: string) =>
+        `${prefix}"${rawValue.replace(/"/g, '\\"')}"${suffix}`,
+    );
+
+const buildParseCandidates = (payload: string): string[] => {
+  const candidates = [payload];
+
+  const fencedPayload = extractCodeFencePayload(payload);
+  if (fencedPayload) {
+    candidates.push(fencedPayload);
+  }
+
+  const objectPayload = extractObjectPayload(payload);
+  if (objectPayload) {
+    candidates.push(objectPayload);
+  }
+
+  const normalizedCandidates: string[] = [];
+  candidates.forEach((candidate) => {
+    normalizedCandidates.push(candidate);
+    normalizedCandidates.push(normalizeSingleQuotedJson(candidate));
+    normalizedCandidates.push(candidate.replace(/'/g, '"'));
+  });
+
+  return Array.from(new Set(normalizedCandidates.map((candidate) => candidate.trim()).filter(Boolean)));
+};
 
 export const parseChartOption = <T extends object>(raw?: string): T | null => {
   if (!raw) {
@@ -35,7 +110,9 @@ export const parseChartOption = <T extends object>(raw?: string): T | null => {
     return null;
   }
 
-  for (const candidate of [payload, payload.replace(/'/g, '"')]) {
+  const candidates = buildParseCandidates(payload);
+
+  for (const candidate of candidates) {
     try {
       const parsed: unknown = JSON.parse(candidate);
       if (isObject(parsed)) {
