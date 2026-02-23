@@ -4,12 +4,12 @@
 
 ## 自动心跳（Auto)
 <<<<<<< HEAD
-- Auto ping: **2026-02-23 16:21 CST (UTC+8)**
+- Auto ping: **2026-02-23 16:27 CST (UTC+8)**
 =======
-- Auto ping: **2026-02-23 16:21 CST (UTC+8)**
+- Auto ping: **2026-02-23 16:27 CST (UTC+8)**
 >>>>>>> 91fd23f (chore(status): manual refresh board heartbeat)
-- Latest commit: **ae45344**
-- Message: **feat: improve async mq task error readability and polling feedback**
+- Latest commit: **97a6abb**
+- Message: **refactor(async-mq): guard stale polling responses and simplify progress panel**
 
 ## 当前阶段
 - **Phase 2 / 4：前后端任务追踪联动（进行中）**
