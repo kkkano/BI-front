@@ -7,6 +7,7 @@ import {
   Col,
   Collapse,
   Empty,
+  Grid,
   List,
   message,
   Modal,
@@ -28,10 +29,10 @@ const { Text } = Typography;
 const FAILURE_REASON_COLLAPSE_KEY = 'failure-reason';
 
 const STATUS_CONFIG: Record<string, { color: string; label: string; shortLabel: string }> = {
-  wait: { color: 'warning', label: '排队中', shortLabel: '排队中' },
-  running: { color: 'processing', label: '分析执行中', shortLabel: '执行中' },
-  succeed: { color: 'success', label: '分析完成', shortLabel: '完成' },
-  failed: { color: 'error', label: '分析失败', shortLabel: '失败' },
+  wait: { color: 'default', label: '排队中', shortLabel: '排队中' },
+  running: { color: 'blue', label: '分析执行中', shortLabel: '执行中' },
+  succeed: { color: 'green', label: '分析完成', shortLabel: '完成' },
+  failed: { color: 'red', label: '分析失败', shortLabel: '失败' },
 };
 
 const POLLING_INTERVAL = 5000;
@@ -100,13 +101,16 @@ const getFailurePreviewLength = (): number => {
   if (typeof window === 'undefined') {
     return 88;
   }
-  return window.innerWidth <= 768 ? 56 : 88;
+  return window.innerWidth <= 768 ? 48 : 88;
 };
 
 /**
  * 我的图表页面
  */
 const MyChartPage: React.FC = () => {
+  const screens = Grid.useBreakpoint();
+  const isMobile = !screens.md;
+
   const initSearchParams: API.ChartQueryRequest = {
     current: 1,
     pageSize: 4,
@@ -254,8 +258,8 @@ const MyChartPage: React.FC = () => {
           }
         }}
       >
-        <ReactECharts option={parsedChartOption} style={{ height: 280 }} />
-        <Text type="secondary" style={{ fontSize: 12 }}>
+        <ReactECharts option={parsedChartOption} style={{ height: isMobile ? 220 : 280 }} />
+        <Text type="secondary" style={{ fontSize: isMobile ? 11 : 12 }}>
           点击图表可放大查看
         </Text>
       </div>
@@ -267,11 +271,13 @@ const MyChartPage: React.FC = () => {
       <Card bordered={false} style={{ marginBottom: 16 }}>
         <Row gutter={[12, 12]} align="middle" justify="space-between">
           <Col xs={24} md={14}>
-            <Text strong style={{ fontSize: 16 }}>
+            <Text strong style={{ fontSize: isMobile ? 15 : 16 }}>
               我的图表
             </Text>
             <br />
-            <Text type="secondary">支持按名称检索，待生成图表会自动刷新状态</Text>
+            <Text type="secondary" style={{ fontSize: isMobile ? 12 : 14 }}>
+              支持按名称检索，待生成图表会自动刷新状态
+            </Text>
           </Col>
           <Col xs={24} md={10}>
             <Search
@@ -368,7 +374,7 @@ const MyChartPage: React.FC = () => {
                 }
                 extra={
                   <Space size="small">
-                    <Text type="secondary" style={{ fontSize: 12 }}>
+                    <Text type="secondary" style={{ fontSize: isMobile ? 11 : 12 }}>
                       {new Date(item.createTime as string).toLocaleString('zh-CN', {
                         month: '2-digit',
                         day: '2-digit',
