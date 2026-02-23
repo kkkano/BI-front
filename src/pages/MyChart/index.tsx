@@ -97,7 +97,23 @@ const truncateText = (text: string, maxLength = 120): string => {
   return `${text.slice(0, maxLength)}...`;
 };
 
-const getFailurePreviewLength = (isMobile: boolean): number => (isMobile ? 48 : 88);
+const getFailurePreviewLength = (isMobile: boolean): number => (isMobile ? 52 : 96);
+
+const getFailureSummary = (message: string): string => {
+  const normalized = message.replace(/\s+/g, ' ').trim();
+  if (!normalized) {
+    return '错误详情为空，请稍后重试。';
+  }
+  const separators = ['。', '；', ';', '\n', ':', '：'];
+  let best = normalized;
+  separators.forEach((separator) => {
+    const segment = normalized.split(separator)[0]?.trim();
+    if (segment && segment.length < best.length) {
+      best = segment;
+    }
+  });
+  return truncateText(best, 44);
+};
 
 /**
  * 我的图表页面
@@ -463,6 +479,7 @@ const MyChartPage: React.FC = () => {
                     <Card type="inner" size="small" title="失败原因" style={{ marginBottom: 8 }}>
                       {(() => {
                         const fullMessage = item.execMessage || '暂无详细错误信息，请稍后重试';
+                        const summary = getFailureSummary(fullMessage);
                         const previewLength = getFailurePreviewLength(isMobile);
                         const previewMessage = truncateText(fullMessage, previewLength);
                         const needsExpand = fullMessage.length > previewLength;
@@ -470,9 +487,22 @@ const MyChartPage: React.FC = () => {
 
                         return (
                           <>
+                            <Card
+                              size="small"
+                              style={{ marginBottom: 10, background: '#fff2f0', borderColor: '#ffccc7' }}
+                              bodyStyle={{ padding: isMobile ? '8px 10px' : '10px 12px' }}
+                            >
+                              <Text strong type="danger">
+                                错误摘要：
+                              </Text>
+                              <Text type="danger" style={{ marginLeft: 6, wordBreak: 'break-word' }}>
+                                {summary}
+                              </Text>
+                            </Card>
                             <Text
                               type="danger"
                               style={{
+                                display: 'block',
                                 whiteSpace: expanded ? 'pre-wrap' : 'normal',
                                 wordBreak: 'break-word',
                                 lineHeight: 1.7,
@@ -484,35 +514,37 @@ const MyChartPage: React.FC = () => {
                               <>
                                 <div style={{ marginTop: 8 }}>
                                   <Text type="secondary" style={{ fontSize: 12 }}>
-                                    鼠标悬停可快速查看完整错误，点击可展开固定。
+                                    移动端建议使用下方“展开失败详情”，桌面端可悬停快速查看。
                                   </Text>
                                 </div>
-                                <div style={{ marginTop: 8 }}>
-                                  <Tooltip
-                                    placement="topLeft"
-                                    title={
-                                      <div
-                                        style={{
-                                          maxWidth: 360,
-                                          whiteSpace: 'pre-wrap',
-                                          wordBreak: 'break-word',
-                                          lineHeight: 1.6,
-                                        }}
-                                      >
-                                        {fullMessage}
-                                      </div>
-                                    }
-                                  >
-                                    <Button
-                                      type="link"
-                                      size="small"
-                                      style={{ padding: 0 }}
-                                      onClick={() => openFailureDetail(item)}
+                                {!isMobile && (
+                                  <div style={{ marginTop: 8 }}>
+                                    <Tooltip
+                                      placement="topLeft"
+                                      title={
+                                        <div
+                                          style={{
+                                            maxWidth: 420,
+                                            whiteSpace: 'pre-wrap',
+                                            wordBreak: 'break-word',
+                                            lineHeight: 1.6,
+                                          }}
+                                        >
+                                          {fullMessage}
+                                        </div>
+                                      }
                                     >
-                                      悬停查看完整错误
-                                    </Button>
-                                  </Tooltip>
-                                </div>
+                                      <Button
+                                        type="link"
+                                        size="small"
+                                        style={{ padding: 0 }}
+                                        onClick={() => openFailureDetail(item)}
+                                      >
+                                        悬停查看完整错误
+                                      </Button>
+                                    </Tooltip>
+                                  </div>
+                                )}
                                 <div style={{ marginTop: 8 }}>
                                   <Collapse
                                     size="small"
@@ -522,7 +554,7 @@ const MyChartPage: React.FC = () => {
                                     items={[
                                       {
                                         key: FAILURE_REASON_COLLAPSE_KEY,
-                                        label: expanded ? '收起失败原因' : '展开失败原因（移动端推荐）',
+                                        label: expanded ? '收起失败详情' : '展开失败详情',
                                         children: (
                                           <Text
                                             type="danger"
