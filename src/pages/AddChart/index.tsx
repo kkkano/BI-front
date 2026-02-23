@@ -7,10 +7,12 @@ import {
 } from '@/utils/chart';
 import { UploadOutlined } from '@ant-design/icons';
 import {
+  Alert,
   Button,
   Card,
   Col,
   Divider,
+  Empty,
   Form,
   Input,
   message,
@@ -18,7 +20,7 @@ import {
   Row,
   Select,
   Space,
-  Spin,
+  Steps,
   Tag,
   Typography,
   Upload,
@@ -28,6 +30,7 @@ import TextArea from 'antd/es/input/TextArea';
 import type { EChartsOption } from 'echarts';
 import React, { useState } from 'react';
 import ReactECharts from 'echarts-for-react';
+import { history } from '@umijs/max';
 
 const { Text } = Typography;
 
@@ -37,6 +40,18 @@ const CHART_TYPE_OPTIONS = [
   { value: '堆叠图', label: '堆叠图' },
   { value: '饼图', label: '饼图' },
   { value: '雷达图', label: '雷达图' },
+];
+
+const SUBMIT_PROGRESS_STEPS = [
+  { title: '上传并校验数据', description: '检查文件格式与内容' },
+  { title: 'AI 分析中', description: '解析目标与结构化数据' },
+  { title: '生成图表结果', description: '输出图表配置与结论' },
+];
+
+const SUBMIT_STAGE_HINT = [
+  '正在上传并校验数据文件，请稍候',
+  'AI 正在分析数据与目标，通常需要 10-30 秒',
+  '已完成分析，正在整理图表展示结果',
 ];
 
 type SubmitMeta = {
@@ -62,11 +77,13 @@ const AddChart: React.FC = () => {
   const [submitMeta, setSubmitMeta] = useState<SubmitMeta>();
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [previewOpen, setPreviewOpen] = useState<boolean>(false);
+  const [loadingStageIndex, setLoadingStageIndex] = useState<number>(0);
 
   const onFinish = async (values: AddChartFormValues) => {
     if (submitting) return;
 
     setSubmitting(true);
+    setLoadingStageIndex(0);
     setChart(undefined);
     setChartOption(undefined);
     setSubmitMeta({
@@ -88,12 +105,14 @@ const AddChart: React.FC = () => {
         return;
       }
 
+      setLoadingStageIndex(1);
       const res = await genChartByAiUsingPOST(params, {}, originFile);
       if (!res?.data) {
         message.error('分析失败');
         return;
       }
 
+      setLoadingStageIndex(2);
       const parsedChart = parseChartOption<EChartsOption>(res.data.genChart);
       if (!parsedChart) {
         message.error('分析成功，但图表配置解析失败');
@@ -171,54 +190,79 @@ const AddChart: React.FC = () => {
 
         <Col xs={24} lg={13}>
           <Card title="分析结果">
-            <Spin spinning={submitting} tip="AI 正在分析数据，请稍候...">
-              {!chart && !submitting && <Text type="secondary">请先在左侧提交分析任务</Text>}
+            {submitting && (
+              <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                <Alert
+                  type="info"
+                  showIcon
+                  message="AI 正在生成图表，请保持页面开启"
+                  description={SUBMIT_STAGE_HINT[loadingStageIndex]}
+                />
+                <Steps size="small" current={loadingStageIndex} items={SUBMIT_PROGRESS_STEPS} />
+                <Text type="secondary">你也可以稍后在“我的图表”页面查看历史结果。</Text>
+              </Space>
+            )}
 
-              {chart && (
-                <Space direction="vertical" size={12} style={{ width: '100%' }}>
-                  <div>
-                    {submitMeta?.name ? (
-                      <Tag color="blue">{submitMeta.name}</Tag>
-                    ) : (
-                      <Tag>未命名图表</Tag>
-                    )}
-                    {submitMeta?.chartType && <Tag>{submitMeta.chartType}</Tag>}
-                  </div>
+            {!chart && !submitting && (
+              <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description="请先在左侧填写分析目标并上传数据文件"
+              />
+            )}
 
-                  <Card type="inner" size="small" title="分析结论">
-                    <Text style={{ whiteSpace: 'pre-wrap' }}>
-                      {chart.genResult || '暂无分析结论，请稍后重试'}
-                    </Text>
-                  </Card>
+            {chart && !submitting && (
+              <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                <div>
+                  {submitMeta?.name ? (
+                    <Tag color="blue">{submitMeta.name}</Tag>
+                  ) : (
+                    <Tag>未命名图表</Tag>
+                  )}
+                  {submitMeta?.chartType && <Tag>{submitMeta.chartType}</Tag>}
+                </div>
 
-                  <Divider style={{ margin: '4px 0' }} />
+                <Card type="inner" size="small" title="分析结论">
+                  <Text style={{ whiteSpace: 'pre-wrap' }}>
+                    {chart.genResult || '暂无分析结论，请稍后重试'}
+                  </Text>
+                </Card>
 
-                  <Card type="inner" size="small" title="可视化图表">
-                    {chartOption ? (
-                      <div
-                        role="button"
-                        tabIndex={0}
-                        style={{ cursor: 'zoom-in' }}
-                        onClick={() => setPreviewOpen(true)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            setPreviewOpen(true);
-                          }
-                        }}
-                      >
-                        <ReactECharts option={chartOption} style={{ height: 360 }} />
-                        <Text type="secondary" style={{ fontSize: 12 }}>
-                          点击图表可放大查看
-                        </Text>
-                      </div>
-                    ) : (
-                      <Text type="warning">图表配置解析失败，请检查原始数据后重试</Text>
-                    )}
-                  </Card>
+                <Divider style={{ margin: '4px 0' }} />
+
+                <Card type="inner" size="small" title="可视化图表">
+                  {chartOption ? (
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      style={{ cursor: 'zoom-in' }}
+                      onClick={() => setPreviewOpen(true)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setPreviewOpen(true);
+                        }
+                      }}
+                    >
+                      <ReactECharts option={chartOption} style={{ height: 360 }} />
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        点击图表可放大查看
+                      </Text>
+                    </div>
+                  ) : (
+                    <Text type="warning">图表配置解析失败，请检查原始数据后重试</Text>
+                  )}
+                </Card>
+
+                <Space wrap>
+                  {chartOption ? (
+                    <Button type="primary" onClick={() => setPreviewOpen(true)}>
+                      放大预览
+                    </Button>
+                  ) : null}
+                  <Button onClick={() => history.push('/my_chart')}>去我的图表</Button>
                 </Space>
-              )}
-            </Spin>
+              </Space>
+            )}
           </Card>
         </Col>
       </Row>
