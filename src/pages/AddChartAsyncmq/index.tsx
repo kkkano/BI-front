@@ -16,6 +16,7 @@ import {
   Tag,
   Upload,
 } from 'antd';
+import type { UploadProps } from 'antd';
 import { useForm } from 'antd/es/form/Form';
 import TextArea from 'antd/es/input/TextArea';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -27,6 +28,44 @@ type TaskEvent = {
   status: string;
   text: string;
   at: string;
+};
+
+type AddChartFormValues = {
+  goal: string;
+  name?: string;
+  chartType?: string;
+  file?: {
+    file?: {
+      originFileObj?: File;
+    };
+    fileList?: {
+      originFileObj?: File;
+    }[];
+  };
+};
+
+const EVENT_TAG_COLOR: Record<string, string> = {
+  submitted: 'blue',
+  wait: 'default',
+  running: 'processing',
+  succeed: 'success',
+  failed: 'error',
+  warning: 'warning',
+  timeout: 'warning',
+  error: 'error',
+  empty: 'warning',
+};
+
+const EVENT_TAG_LABEL: Record<string, string> = {
+  submitted: '已提交',
+  wait: '排队中',
+  running: '执行中',
+  succeed: '已完成',
+  failed: '执行失败',
+  warning: '查询告警',
+  timeout: '追踪超时',
+  error: '查询失败',
+  empty: '返回为空',
 };
 
 /**
@@ -87,6 +126,14 @@ const AddChartAsync: React.FC = () => {
     if (chartDetail?.status === 'succeed') return 'success';
     return 'active';
   }, [chartDetail?.status]);
+
+  const beforeUpload: UploadProps['beforeUpload'] = (file) => {
+    if (!/\.(xlsx|xls|csv)$/i.test(file.name)) {
+      message.error('仅支持 .xlsx / .xls / .csv 文件');
+      return Upload.LIST_IGNORE;
+    }
+    return false;
+  };
 
   const stopPolling = () => {
     if (timerRef.current) {
@@ -223,7 +270,7 @@ const AddChartAsync: React.FC = () => {
     message.success('已恢复自动追踪，请稍候查看最新状态');
   };
 
-  const onFinish = async (values: any) => {
+  const onFinish = async (values: AddChartFormValues) => {
     if (submitting) return;
 
     setSubmitting(true);
@@ -233,13 +280,14 @@ const AddChartAsync: React.FC = () => {
     stopPolling();
     resetPollingState();
 
-    const params = {
-      ...values,
-      file: undefined,
+    const params: API.genChartByAiAsyncMqUsingPOSTParams = {
+      goal: values.goal,
+      name: values.name,
+      chartType: values.chartType,
     };
 
     try {
-      const originFile = values?.file?.file?.originFileObj;
+      const originFile = values?.file?.file?.originFileObj || values?.file?.fileList?.[0]?.originFileObj;
       if (!originFile) {
         message.error('请上传数据文件');
         return;
@@ -323,7 +371,7 @@ const AddChartAsync: React.FC = () => {
   const timelineItems = events.map((event) => ({
     title: (
       <Space>
-        <Tag>{event.status}</Tag>
+        <Tag color={EVENT_TAG_COLOR[event.status] || 'default'}>{EVENT_TAG_LABEL[event.status] || event.status}</Tag>
         <span>{event.text}</span>
       </Space>
     ),
@@ -365,10 +413,10 @@ const AddChartAsync: React.FC = () => {
           <Form.Item
             name="file"
             label="原始数据"
-            rules={[{ required: true, message: '请上传数据文件（xlsx）' }]}
+            rules={[{ required: true, message: '请上传数据文件（xlsx / xls / csv）' }]}
           >
-            <Upload name="file" maxCount={1}>
-              <Button icon={<UploadOutlined />}>上传文件（后缀 .xlsx / .xls）</Button>
+            <Upload name="file" maxCount={1} accept=".xlsx,.xls,.csv" beforeUpload={beforeUpload}>
+              <Button icon={<UploadOutlined />}>上传文件（后缀 .xlsx / .xls / .csv）</Button>
             </Upload>
           </Form.Item>
           <Form.Item wrapperCol={{ span: 16, offset: 4 }}>
