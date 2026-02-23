@@ -2,6 +2,13 @@ import {
   genChartByAiAsyncUsingPOST,
   getChartTaskStatusUsingGET,
 } from '@/services/yubi/chartController';
+import {
+  getErrorMessage,
+  getUploadFile,
+  hasUsableOption,
+  parseChartOption,
+  type UploadFieldValue,
+} from '@/utils/chart';
 import { UploadOutlined } from '@ant-design/icons';
 import {
   Alert,
@@ -48,14 +55,7 @@ type AddChartFormValues = {
   goal: string;
   name?: string;
   chartType?: string;
-  file?: {
-    file?: {
-      originFileObj?: File;
-    };
-    fileList?: {
-      originFileObj?: File;
-    }[];
-  };
+  file?: UploadFieldValue;
 };
 
 const EVENT_TAG_COLOR: Record<string, string> = {
@@ -89,52 +89,12 @@ const isTerminalTaskStatus = (
 ): status is Extract<TaskStatus, 'succeed' | 'failed'> =>
   status === 'succeed' || status === 'failed';
 
-const getErrorMessage = (error: unknown): string => {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-  if (typeof error === 'string' && error.trim()) {
-    return error;
-  }
-  return '未知错误';
-};
-
 const toTaskStatus = (status?: string): TaskStatus => {
   if (status === 'wait' || status === 'running' || status === 'succeed' || status === 'failed') {
     return status;
   }
   return 'running';
 };
-
-const getUploadFile = (fileField?: AddChartFormValues['file']): File | undefined =>
-  fileField?.file?.originFileObj || fileField?.fileList?.[0]?.originFileObj;
-
-const parseChartOption = (genChart?: string): EChartsOption | null => {
-  if (!genChart) {
-    return null;
-  }
-
-  const payload = genChart.trim();
-  if (!payload) {
-    return null;
-  }
-
-  for (const candidate of [payload, payload.replace(/'/g, '"')]) {
-    try {
-      const parsed: unknown = JSON.parse(candidate);
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        return parsed as EChartsOption;
-      }
-    } catch {
-      continue;
-    }
-  }
-
-  return null;
-};
-
-const hasUsableOption = (option: EChartsOption | null): option is EChartsOption =>
-  !!option && Object.keys(option as Record<string, unknown>).length > 0;
 
 const getCurrentTime = (): string => new Date().toLocaleTimeString('zh-CN', { hour12: false });
 
@@ -415,7 +375,7 @@ const AddChartAsync: React.FC = () => {
 
   const renderResult = () => {
     if (status === 'succeed') {
-      const option = parseChartOption(chartDetail?.genChart);
+      const option = parseChartOption<EChartsOption>(chartDetail?.genChart);
 
       return (
         <>

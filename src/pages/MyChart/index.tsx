@@ -1,4 +1,5 @@
 import { deleteChartUsingPOST, listMyChartByPageUsingPOST } from '@/services/yubi/chartController';
+import { getErrorMessage, parseChartOption } from '@/utils/chart';
 import { useModel } from '@@/exports';
 import {
   Avatar,
@@ -23,7 +24,7 @@ import {
 import ReactECharts from 'echarts-for-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Search from 'antd/es/input/Search';
-import type { ECharts } from 'echarts';
+import type { ECharts, EChartsOption } from 'echarts';
 
 const { Text } = Typography;
 const FAILURE_REASON_COLLAPSE_KEY = 'failure-reason';
@@ -71,23 +72,15 @@ const statusToResultStatus = (status?: string): 'warning' | 'info' | 'success' |
   return 'error';
 };
 
-const isValidJson = (str: string): boolean => {
-  try {
-    JSON.parse(str.replace(/'/g, '"'));
-    return true;
-  } catch {
-    return false;
+const toPreviewChartOption = (raw: string | undefined): EChartsOption | undefined => {
+  const parsed = parseChartOption<EChartsOption>(raw);
+  if (!parsed) {
+    return undefined;
   }
-};
 
-const safeParseChart = (raw: string | undefined): object => {
-  try {
-    const obj = JSON.parse((raw ?? '{}').replace(/'/g, '"'));
-    obj.title = undefined;
-    return obj;
-  } catch {
-    return {};
-  }
+  const sanitized = { ...(parsed as Record<string, unknown>) };
+  delete sanitized.title;
+  return sanitized as EChartsOption;
 };
 
 const truncateText = (text: string, maxLength = 120): string => {
@@ -136,13 +129,17 @@ const MyChartPage: React.FC = () => {
   const [total, setTotal] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
   const [deletingId, setDeletingId] = useState<number | undefined>();
-  const [previewChart, setPreviewChart] = useState<{ title: string; option: object } | null>(null);
-  const [previewLoadingId, setPreviewLoadingId] = useState<number | undefined>();
-  const [failureDetail, setFailureDetail] = useState<{ title: string; message: string } | null>(null);
-  const [expandedFailureIds, setExpandedFailureIds] = useState<Record<number, boolean>>({});
-  const [statusFilter, setStatusFilter] = useState<'all' | 'wait' | 'running' | 'succeed' | 'failed'>(
-    'all',
+  const [previewChart, setPreviewChart] = useState<{ title: string; option: EChartsOption } | null>(
+    null,
   );
+  const [previewLoadingId, setPreviewLoadingId] = useState<number | undefined>();
+  const [failureDetail, setFailureDetail] = useState<{ title: string; message: string } | null>(
+    null,
+  );
+  const [expandedFailureIds, setExpandedFailureIds] = useState<Record<number, boolean>>({});
+  const [statusFilter, setStatusFilter] = useState<
+    'all' | 'wait' | 'running' | 'succeed' | 'failed'
+  >('all');
   const previewInstanceRef = useRef<ECharts | null>(null);
   const pollingRequestingRef = useRef(false);
 
@@ -176,9 +173,9 @@ const MyChartPage: React.FC = () => {
         } else if (!silent) {
           message.error('获取我的图表失败');
         }
-      } catch (e: any) {
+      } catch (error: unknown) {
         if (!silent) {
-          message.error('获取我的图表失败，' + e.message);
+          message.error('获取我的图表失败，' + getErrorMessage(error));
         }
       } finally {
         if (silent) {
@@ -215,13 +212,13 @@ const MyChartPage: React.FC = () => {
         message.success('图表已删除');
         loadData();
       }
-    } catch (e: any) {
-      message.error('删除失败，' + e.message);
+    } catch (error: unknown) {
+      message.error('删除失败，' + getErrorMessage(error));
     }
     setDeletingId(undefined);
   };
 
-  const openChartPreview = (item: API.Chart, parsedChartOption: object) => {
+  const openChartPreview = (item: API.Chart, parsedChartOption: EChartsOption) => {
     setPreviewLoadingId(item.id);
     setPreviewChart({
       title: item.name || '未命名图表',
@@ -245,7 +242,7 @@ const MyChartPage: React.FC = () => {
     }));
   };
 
-  const renderChartPreview = (item: API.Chart, parsedChartOption?: object) => {
+  const renderChartPreview = (item: API.Chart, parsedChartOption?: EChartsOption) => {
     if (!parsedChartOption) {
       return (
         <Empty
@@ -318,7 +315,9 @@ const MyChartPage: React.FC = () => {
                   value: option.value,
                 };
               })}
-              onChange={(value) => setStatusFilter(value as 'all' | 'wait' | 'running' | 'succeed' | 'failed')}
+              onChange={(value) =>
+                setStatusFilter(value as 'all' | 'wait' | 'running' | 'succeed' | 'failed')
+              }
             />
           </Col>
         </Row>
@@ -326,7 +325,8 @@ const MyChartPage: React.FC = () => {
       <List
         grid={{ gutter: 16, xs: 1, sm: 1, md: 1, lg: 2, xl: 2, xxl: 2 }}
         pagination={{
-          onChange: (page, pageSize) => setSearchParams({ ...searchParams, current: page, pageSize }),
+          onChange: (page, pageSize) =>
+            setSearchParams({ ...searchParams, current: page, pageSize }),
           current: searchParams.current,
           pageSize: searchParams.pageSize,
           total,
@@ -339,9 +339,7 @@ const MyChartPage: React.FC = () => {
         renderItem={(item) => {
           const statusCfg = STATUS_CONFIG[item.status ?? ''];
           const parsedChartOption =
-            item.status === 'succeed' && item.genChart && isValidJson(item.genChart)
-              ? safeParseChart(item.genChart)
-              : undefined;
+            item.status === 'succeed' ? toPreviewChartOption(item.genChart) : undefined;
           return (
             <List.Item key={item.id}>
               <Card
@@ -367,10 +365,7 @@ const MyChartPage: React.FC = () => {
                     {statusCfg && (
                       <Col flex="none">
                         <Tooltip title={STATUS_TOOLTIP_TEXT[item.status ?? '']}>
-                          <Tag
-                            color={statusCfg.color}
-                            style={{ marginRight: 0, maxWidth: '100%' }}
-                          >
+                          <Tag color={statusCfg.color} style={{ marginRight: 0, maxWidth: '100%' }}>
                             <Text
                               style={{ color: 'inherit', maxWidth: '100%' }}
                               ellipsis={{ tooltip: statusCfg.label }}
@@ -439,7 +434,11 @@ const MyChartPage: React.FC = () => {
                   <>
                     <Result
                       status={statusToResultStatus(item.status)}
-                      title={item.status === 'wait' ? STATUS_CONFIG.wait.label : STATUS_CONFIG.running.label}
+                      title={
+                        item.status === 'wait'
+                          ? STATUS_CONFIG.wait.label
+                          : STATUS_CONFIG.running.label
+                      }
                       subTitle={
                         item.execMessage ??
                         (item.status === 'wait'
@@ -455,12 +454,7 @@ const MyChartPage: React.FC = () => {
                 )}
                 {item.status === 'succeed' && (
                   <>
-                    <Card
-                      type="inner"
-                      size="small"
-                      title="分析结论"
-                      style={{ marginBottom: 12 }}
-                    >
+                    <Card type="inner" size="small" title="分析结论" style={{ marginBottom: 12 }}>
                       <Text>
                         {item.genResult ?? '暂无分析结论，建议返回 AddChart 重新生成以补充内容'}
                       </Text>
@@ -489,13 +483,20 @@ const MyChartPage: React.FC = () => {
                           <>
                             <Card
                               size="small"
-                              style={{ marginBottom: 10, background: '#fff2f0', borderColor: '#ffccc7' }}
+                              style={{
+                                marginBottom: 10,
+                                background: '#fff2f0',
+                                borderColor: '#ffccc7',
+                              }}
                               bodyStyle={{ padding: isMobile ? '8px 10px' : '10px 12px' }}
                             >
                               <Text strong type="danger">
                                 错误摘要：
                               </Text>
-                              <Text type="danger" style={{ marginLeft: 6, wordBreak: 'break-word' }}>
+                              <Text
+                                type="danger"
+                                style={{ marginLeft: 6, wordBreak: 'break-word' }}
+                              >
                                 {summary}
                               </Text>
                             </Card>
@@ -550,7 +551,9 @@ const MyChartPage: React.FC = () => {
                                     size="small"
                                     bordered={false}
                                     activeKey={expanded ? [FAILURE_REASON_COLLAPSE_KEY] : []}
-                                    onChange={(keys) => handleFailureCollapseChange(item.id as number, keys)}
+                                    onChange={(keys) =>
+                                      handleFailureCollapseChange(item.id as number, keys)
+                                    }
                                     items={[
                                       {
                                         key: FAILURE_REASON_COLLAPSE_KEY,

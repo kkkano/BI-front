@@ -1,4 +1,10 @@
 import { genChartByAiUsingPOST } from '@/services/yubi/chartController';
+import {
+  getErrorMessage,
+  getUploadFile,
+  parseChartOption,
+  type UploadFieldValue,
+} from '@/utils/chart';
 import { UploadOutlined } from '@ant-design/icons';
 import {
   Button,
@@ -19,6 +25,7 @@ import {
 } from 'antd';
 import { useForm } from 'antd/es/form/Form';
 import TextArea from 'antd/es/input/TextArea';
+import type { EChartsOption } from 'echarts';
 import React, { useState } from 'react';
 import ReactECharts from 'echarts-for-react';
 
@@ -38,13 +45,11 @@ type SubmitMeta = {
   chartType?: string;
 };
 
-const safeParseChartOption = (raw?: string): object | undefined => {
-  if (!raw) return undefined;
-  try {
-    return JSON.parse(raw.replace(/'/g, '"'));
-  } catch {
-    return undefined;
-  }
+type AddChartFormValues = {
+  goal: string;
+  name?: string;
+  chartType?: string;
+  file?: UploadFieldValue;
 };
 
 /**
@@ -53,12 +58,12 @@ const safeParseChartOption = (raw?: string): object | undefined => {
 const AddChart: React.FC = () => {
   const [form] = useForm();
   const [chart, setChart] = useState<API.BiResponse>();
-  const [chartOption, setChartOption] = useState<object>();
+  const [chartOption, setChartOption] = useState<EChartsOption>();
   const [submitMeta, setSubmitMeta] = useState<SubmitMeta>();
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [previewOpen, setPreviewOpen] = useState<boolean>(false);
 
-  const onFinish = async (values: SubmitMeta & { file?: any }) => {
+  const onFinish = async (values: AddChartFormValues) => {
     if (submitting) return;
 
     setSubmitting(true);
@@ -70,13 +75,14 @@ const AddChart: React.FC = () => {
       chartType: values.chartType,
     });
 
-    const params = {
-      ...values,
-      file: undefined,
+    const params: API.genChartByAiUsingPOSTParams = {
+      goal: values.goal,
+      name: values.name,
+      chartType: values.chartType,
     };
 
     try {
-      const originFile = values?.file?.file?.originFileObj;
+      const originFile = getUploadFile(values.file);
       if (!originFile) {
         message.error('请上传数据文件');
         return;
@@ -88,7 +94,7 @@ const AddChart: React.FC = () => {
         return;
       }
 
-      const parsedChart = safeParseChartOption(res.data.genChart);
+      const parsedChart = parseChartOption<EChartsOption>(res.data.genChart);
       if (!parsedChart) {
         message.error('分析成功，但图表配置解析失败');
         setChart(res.data);
@@ -98,8 +104,8 @@ const AddChart: React.FC = () => {
       setChart(res.data);
       setChartOption(parsedChart);
       message.success('分析成功');
-    } catch (e: any) {
-      message.error('分析失败，' + e.message);
+    } catch (error: unknown) {
+      message.error('分析失败，' + getErrorMessage(error));
     } finally {
       setSubmitting(false);
     }
@@ -139,19 +145,19 @@ const AddChart: React.FC = () => {
                 label="原始数据"
                 rules={[{ required: true, message: '请上传数据文件!' }]}
               >
-                <Upload
-                  name="file"
-                  maxCount={1}
-                  accept=".xlsx,.csv"
-                  beforeUpload={() => false}
-                >
+                <Upload name="file" maxCount={1} accept=".xlsx,.csv" beforeUpload={() => false}>
                   <Button icon={<UploadOutlined />}>上传数据文件（.xlsx / .csv）</Button>
                 </Upload>
               </Form.Item>
 
               <Form.Item wrapperCol={{ span: 17, offset: 5 }}>
                 <Space>
-                  <Button type="primary" htmlType="submit" loading={submitting} disabled={submitting}>
+                  <Button
+                    type="primary"
+                    htmlType="submit"
+                    loading={submitting}
+                    disabled={submitting}
+                  >
                     提交分析
                   </Button>
                   <Button htmlType="reset" disabled={submitting}>
@@ -171,7 +177,11 @@ const AddChart: React.FC = () => {
               {chart && (
                 <Space direction="vertical" size={12} style={{ width: '100%' }}>
                   <div>
-                    {submitMeta?.name ? <Tag color="blue">{submitMeta.name}</Tag> : <Tag>未命名图表</Tag>}
+                    {submitMeta?.name ? (
+                      <Tag color="blue">{submitMeta.name}</Tag>
+                    ) : (
+                      <Tag>未命名图表</Tag>
+                    )}
                     {submitMeta?.chartType && <Tag>{submitMeta.chartType}</Tag>}
                   </div>
 
@@ -221,7 +231,9 @@ const AddChart: React.FC = () => {
         onCancel={() => setPreviewOpen(false)}
         destroyOnClose
       >
-        {chartOption && <ReactECharts option={chartOption} style={{ height: '65vh', minHeight: 420 }} />}
+        {chartOption && (
+          <ReactECharts option={chartOption} style={{ height: '65vh', minHeight: 420 }} />
+        )}
       </Modal>
     </div>
   );
