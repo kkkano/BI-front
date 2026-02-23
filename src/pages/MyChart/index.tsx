@@ -1,4 +1,8 @@
-import { deleteChartUsingPOST, listMyChartByPageUsingPOST } from '@/services/yubi/chartController';
+import {
+  deleteChartUsingPOST,
+  getChartTaskStatusBatchUsingPOST,
+  listMyChartByPageUsingPOST,
+} from '@/services/yubi/chartController';
 import { getErrorMessage, parseChartOption } from '@/utils/chart';
 import { useModel } from '@@/exports';
 import {
@@ -72,6 +76,21 @@ const statusToResultStatus = (status?: string): 'warning' | 'info' | 'success' |
   return 'error';
 };
 
+const isPendingChart = (chart?: API.Chart): boolean =>
+  chart?.status === 'wait' || chart?.status === 'running';
+
+const mergeChartTaskStatus = (chart: API.Chart, taskStatus: API.ChartTaskStatusVO): API.Chart => ({
+  ...chart,
+  name: taskStatus.name ?? chart.name,
+  goal: taskStatus.goal ?? chart.goal,
+  chartType: taskStatus.chartType ?? chart.chartType,
+  status: taskStatus.status ?? chart.status,
+  execMessage: taskStatus.execMessage ?? chart.execMessage,
+  genChart: taskStatus.genChart ?? chart.genChart,
+  genResult: taskStatus.genResult ?? chart.genResult,
+  updateTime: taskStatus.updateTime ?? chart.updateTime,
+});
+
 const toPreviewChartOption = (raw: string | undefined): EChartsOption | undefined => {
   const parsed = parseChartOption<EChartsOption>(raw);
   if (!parsed) {
@@ -142,9 +161,10 @@ const MyChartPage: React.FC = () => {
   >('all');
   const previewInstanceRef = useRef<ECharts | null>(null);
   const pollingRequestingRef = useRef(false);
+  const chartListRef = useRef<API.Chart[]>([]);
 
   const hasPendingCharts = useMemo(
-    () => chartList.some((chart) => chart.status === 'wait' || chart.status === 'running'),
+    () => chartList.some((chart) => isPendingChart(chart)),
     [chartList],
   );
 
@@ -155,38 +175,76 @@ const MyChartPage: React.FC = () => {
     return chartList.filter((chart) => chart.status === statusFilter);
   }, [chartList, statusFilter]);
 
-  const loadData = useCallback(
-    async (silent = false) => {
-      if (silent && pollingRequestingRef.current) {
+  useEffect(() => {
+    chartListRef.current = chartList;
+  }, [chartList]);
+
+  const refreshPendingChartStatus = useCallback(async () => {
+    if (pollingRequestingRef.current) {
+      return;
+    }
+
+    const pendingChartIds = chartListRef.current
+      .filter((chart) => isPendingChart(chart) && typeof chart.id === 'number')
+      .map((chart) => chart.id as number);
+
+    if (pendingChartIds.length === 0) {
+      return;
+    }
+
+    pollingRequestingRef.current = true;
+    try {
+      const res = await getChartTaskStatusBatchUsingPOST({ chartIds: pendingChartIds });
+      const taskStatusList = res?.data ?? [];
+      if (!taskStatusList.length) {
         return;
       }
-      if (silent) {
-        pollingRequestingRef.current = true;
+
+      const taskStatusMap = new Map<number, API.ChartTaskStatusVO>();
+      taskStatusList.forEach((taskStatus) => {
+        if (typeof taskStatus.chartId === 'number') {
+          taskStatusMap.set(taskStatus.chartId, taskStatus);
+        }
+      });
+      if (taskStatusMap.size === 0) {
+        return;
+      }
+
+      setChartList((prev) =>
+        prev.map((chart) => {
+          if (typeof chart.id !== 'number') {
+            return chart;
+          }
+          const taskStatus = taskStatusMap.get(chart.id);
+          if (!taskStatus) {
+            return chart;
+          }
+          return mergeChartTaskStatus(chart, taskStatus);
+        }),
+      );
+    } catch (_error: unknown) {
+      return;
+    } finally {
+      pollingRequestingRef.current = false;
+    }
+  }, []);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await listMyChartByPageUsingPOST(searchParams);
+      if (res.data) {
+        setChartList(res.data.records ?? []);
+        setTotal(res.data.total ?? 0);
       } else {
-        setLoading(true);
+        message.error('获取我的图表失败');
       }
-      try {
-        const res = await listMyChartByPageUsingPOST(searchParams);
-        if (res.data) {
-          setChartList(res.data.records ?? []);
-          setTotal(res.data.total ?? 0);
-        } else if (!silent) {
-          message.error('获取我的图表失败');
-        }
-      } catch (error: unknown) {
-        if (!silent) {
-          message.error('获取我的图表失败，' + getErrorMessage(error));
-        }
-      } finally {
-        if (silent) {
-          pollingRequestingRef.current = false;
-        } else {
-          setLoading(false);
-        }
-      }
-    },
-    [searchParams],
-  );
+    } catch (error: unknown) {
+      message.error('获取我的图表失败，' + getErrorMessage(error));
+    } finally {
+      setLoading(false);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     loadData();
@@ -197,10 +255,10 @@ const MyChartPage: React.FC = () => {
       return;
     }
     const timer = window.setInterval(() => {
-      loadData(true);
+      refreshPendingChartStatus();
     }, POLLING_INTERVAL);
     return () => window.clearInterval(timer);
-  }, [hasPendingCharts, loadData]);
+  }, [hasPendingCharts, refreshPendingChartStatus]);
 
   const handleDeleteChart = async (id: number) => {
     setDeletingId(id);

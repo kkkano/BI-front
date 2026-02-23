@@ -40,6 +40,12 @@ declare namespace API {
     message?: string;
   };
 
+  type BaseResponseListChartTaskStatusVO_ = {
+    code?: number;
+    data?: ChartTaskStatusVO[];
+    message?: string;
+  };
+
   type BaseResponsePageChart_ = {
     code?: number;
     data?: PageChart_;
@@ -125,6 +131,10 @@ declare namespace API {
     name?: string;
   };
 
+  type ChartTaskStatusBatchRequest = {
+    chartIds?: number[];
+  };
+
   type ChartTaskStatusVO = {
     chartId?: number;
     name?: string;
@@ -134,6 +144,8 @@ declare namespace API {
     genChart?: string;
     genResult?: string;
     status?: string;
+    createTime?: string;
+    updateTime?: string;
   };
 
   type ChartUpdateRequest = {

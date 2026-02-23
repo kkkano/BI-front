@@ -185,6 +185,21 @@ export async function getChartTaskStatusUsingGET(
   });
 }
 
+/** getChartTaskStatusBatch POST /api/chart/task/status/batch */
+export async function getChartTaskStatusBatchUsingPOST(
+  body: API.ChartTaskStatusBatchRequest,
+  options?: { [key: string]: any },
+) {
+  return request<API.BaseResponseListChartTaskStatusVO_>('/api/chart/task/status/batch', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: body,
+    ...(options || {}),
+  });
+}
+
 /** listChartByPage POST /api/chart/list/page */
 export async function listChartByPageUsingPOST(
   body: API.ChartQueryRequest,
