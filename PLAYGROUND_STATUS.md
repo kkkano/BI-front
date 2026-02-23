@@ -4,12 +4,12 @@
 
 ## 自动心跳（Auto)
 <<<<<<< HEAD
-- Auto ping: **2026-02-23 16:37 CST (UTC+8)**
+- Auto ping: **2026-02-23 20:43 CST (UTC+8)**
 =======
-- Auto ping: **2026-02-23 16:37 CST (UTC+8)**
+- Auto ping: **2026-02-23 20:43 CST (UTC+8)**
 >>>>>>> 91fd23f (chore(status): manual refresh board heartbeat)
-- Latest commit: **272d88f**
-- Message: **refactor(async): extract shared chart task polling hook**
+- Latest commit: **5b38a1e**
+- Message: **feat(my-chart): batch poll pending chart task status**
 
 ## 当前阶段
 - **Phase 2 / 4：前后端任务追踪联动（进行中）**
