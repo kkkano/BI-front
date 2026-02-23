@@ -40,6 +40,8 @@ const AddChartAsync: React.FC = () => {
   const [chartDetail, setChartDetail] = useState<API.ChartTaskStatusVO>();
   const [events, setEvents] = useState<TaskEvent[]>([]);
   const [countdown, setCountdown] = useState<number>(0);
+  const [pollTimeoutReached, setPollTimeoutReached] = useState<boolean>(false);
+  const [manualRefreshing, setManualRefreshing] = useState<boolean>(false);
 
   const timerRef = useRef<NodeJS.Timeout>();
   const countdownTimerRef = useRef<NodeJS.Timeout>();
@@ -70,6 +72,8 @@ const AddChartAsync: React.FC = () => {
     return 'active';
   }, [chartDetail?.status]);
 
+  const isTerminalStatus = chartDetail?.status === 'succeed' || chartDetail?.status === 'failed';
+
   const nextRefreshInSec = useMemo(() => {
     if (!chartDetail || chartDetail.status === 'succeed' || chartDetail.status === 'failed') return 0;
     return POLL_INTERVAL_MS / 1000;
@@ -90,6 +94,7 @@ const AddChartAsync: React.FC = () => {
   const resetPollingState = () => {
     pollCountRef.current = 0;
     errorCountRef.current = 0;
+    setPollTimeoutReached(false);
   };
 
   const addEvent = (status: string, text: string) => {
@@ -108,7 +113,20 @@ const AddChartAsync: React.FC = () => {
     });
   };
 
-  const fetchChartDetail = async (id: number) => {
+  const fetchChartDetail = async (id: number, source: 'auto' | 'manual' = 'auto') => {
+    if (source === 'auto' && pollCountRef.current >= MAX_RETRY) {
+      stopPolling();
+      setPollTimeoutReached(true);
+      addEvent('timeout', '自动追踪超时：已达到最大查询次数。你可以重试自动追踪，或稍后在“我的图表”查看最终结果');
+      message.warning('自动追踪超时：已达到最大查询次数。你可以重试自动追踪，或稍后在“我的图表”查看最终结果');
+      return;
+    }
+
+    if (source === 'manual') {
+      setManualRefreshing(true);
+      setCountdown(POLL_INTERVAL_MS / 1000);
+    }
+
     pollCountRef.current += 1;
 
     try {
@@ -129,11 +147,6 @@ const AddChartAsync: React.FC = () => {
           return;
         }
 
-        if (pollCountRef.current >= MAX_RETRY) {
-          stopPolling();
-          addEvent('timeout', '自动追踪次数已达上限，请稍后在“我的图表”查看结果');
-          message.warning('自动追踪次数已达上限，请稍后在“我的图表”查看结果');
-        }
       }
     } catch (e: any) {
       errorCountRef.current += 1;
@@ -144,6 +157,10 @@ const AddChartAsync: React.FC = () => {
         message.error('状态查询连续失败次数过多，已暂停自动追踪，请稍后手动刷新');
       } else {
         message.warning(`状态查询失败（连续 ${errorCountRef.current}/${MAX_RETRY} 次），系统将继续自动重试`);
+      }
+    } finally {
+      if (source === 'manual') {
+        setManualRefreshing(false);
       }
     }
   };
@@ -165,6 +182,12 @@ const AddChartAsync: React.FC = () => {
   useEffect(() => {
     return () => stopPolling();
   }, []);
+
+  const onRetryAutoPolling = () => {
+    if (!chartId || isTerminalStatus || manualRefreshing) return;
+    startPolling(chartId);
+    message.success('已恢复自动追踪，请稍候查看最新状态');
+  };
 
   const onFinish = async (values: any) => {
     if (submitting) return;
@@ -217,9 +240,24 @@ const AddChartAsync: React.FC = () => {
                 status={progressStatus as 'active' | 'success' | 'exception'}
                 format={() => `${progressPercent}%`}
               />
-              <Space>
-                <Button onClick={() => chartId && fetchChartDetail(chartId)}>立即刷新</Button>
-                <Tag color="blue">下次自动刷新：{countdown}s</Tag>
+              <Space wrap>
+                <Button
+                  onClick={() => chartId && fetchChartDetail(chartId, 'manual')}
+                  loading={manualRefreshing}
+                  disabled={isTerminalStatus || manualRefreshing}
+                >
+                  立即刷新
+                </Button>
+                {pollTimeoutReached ? (
+                  <Button type="primary" onClick={onRetryAutoPolling} disabled={isTerminalStatus || manualRefreshing}>
+                    重试自动追踪
+                  </Button>
+                ) : null}
+                {!isTerminalStatus ? (
+                  <Tag color={countdown <= 3 ? 'orange' : 'blue'}>
+                    下次自动刷新：{manualRefreshing ? '同步中...' : `${countdown}s`}
+                  </Tag>
+                ) : null}
                 <Tag color="processing">已轮询：{pollCountRef.current}/{MAX_RETRY}</Tag>
               </Space>
             </Space>
