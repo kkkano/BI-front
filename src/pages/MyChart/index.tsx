@@ -24,11 +24,11 @@ import Search from 'antd/es/input/Search';
 
 const { Text } = Typography;
 
-const STATUS_CONFIG: Record<string, { color: string; label: string }> = {
-  wait: { color: 'warning', label: '待生成' },
-  running: { color: 'processing', label: '生成中' },
-  succeed: { color: 'success', label: '已完成' },
-  failed: { color: 'error', label: '生成失败' },
+const STATUS_CONFIG: Record<string, { color: string; label: string; shortLabel: string }> = {
+  wait: { color: 'warning', label: '待生成', shortLabel: '待' },
+  running: { color: 'processing', label: '生成中', shortLabel: '中' },
+  succeed: { color: 'success', label: '已完成', shortLabel: '成' },
+  failed: { color: 'error', label: '生成失败', shortLabel: '败' },
 };
 
 const POLLING_INTERVAL = 5000;
@@ -303,6 +303,7 @@ const MyChartPage: React.FC = () => {
             <List.Item key={item.id}>
               <Card
                 style={{ width: '100%' }}
+                bodyStyle={{ padding: 12 }}
                 size="small"
                 title={
                   <Row align="middle" gutter={8} wrap={false}>
@@ -323,8 +324,16 @@ const MyChartPage: React.FC = () => {
                     {statusCfg && (
                       <Col flex="none">
                         <Tooltip title={STATUS_TOOLTIP_TEXT[item.status ?? '']}>
-                          <Tag color={statusCfg.color} style={{ marginRight: 0 }}>
-                            {statusCfg.label}
+                          <Tag
+                            color={statusCfg.color}
+                            style={{ marginRight: 0, maxWidth: 88 }}
+                          >
+                            <Text
+                              style={{ color: 'inherit', maxWidth: 56 }}
+                              ellipsis={{ tooltip: statusCfg.label }}
+                            >
+                              {statusCfg.label}
+                            </Text>
                           </Tag>
                         </Tooltip>
                       </Col>
@@ -425,14 +434,17 @@ const MyChartPage: React.FC = () => {
                       style={{ padding: '16px 0 8px' }}
                     />
                     <Card type="inner" size="small" title="失败原因" style={{ marginBottom: 8 }}>
-                      <Text type="danger" style={{ whiteSpace: 'pre-wrap' }}>
+                      <Text
+                        type="danger"
+                        style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.7 }}
+                      >
                         {item.execMessage
-                          ? truncateText(item.execMessage, 160)
+                          ? truncateText(item.execMessage, 88)
                           : '暂无详细错误信息，请稍后重试'}
                       </Text>
-                      {item.execMessage && item.execMessage.length > 160 && (
+                      {item.execMessage && item.execMessage.length > 88 && (
                         <div style={{ marginTop: 8 }}>
-                          <Tooltip title={item.execMessage}>
+                          <Tooltip title={<div style={{ whiteSpace: 'pre-wrap' }}>{item.execMessage}</div>}>
                             <Button type="link" size="small" style={{ padding: 0 }}>
                               查看完整错误
                             </Button>
