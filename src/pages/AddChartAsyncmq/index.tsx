@@ -9,6 +9,7 @@ import {
   Form,
   Input,
   message,
+  Progress,
   Result,
   Select,
   Space,
@@ -37,8 +38,10 @@ const AddChartAsync: React.FC = () => {
   const [chartId, setChartId] = useState<number>();
   const [chartDetail, setChartDetail] = useState<API.ChartTaskStatusVO>();
   const [events, setEvents] = useState<TaskEvent[]>([]);
+  const [countdown, setCountdown] = useState<number>(0);
 
   const timerRef = useRef<NodeJS.Timeout>();
+  const countdownTimerRef = useRef<NodeJS.Timeout>();
   const pollCountRef = useRef<number>(0);
   const errorCountRef = useRef<number>(0);
 
@@ -54,11 +57,38 @@ const AddChartAsync: React.FC = () => {
     return '未开始';
   }, [chartDetail?.status]);
 
+  const progressPercent = useMemo(() => {
+    const status = chartDetail?.status;
+    if (status === 'succeed') return 100;
+    if (status === 'failed') return 100;
+    if (status === 'running') return 60;
+    if (status === 'wait') return 20;
+    if (!chartId) return 0;
+    const base = Math.min((pollCountRef.current / MAX_RETRY) * 80, 80);
+    return Math.round(base);
+  }, [chartDetail?.status, chartId]);
+
+  const progressStatus = useMemo(() => {
+    if (chartDetail?.status === 'failed') return 'exception';
+    if (chartDetail?.status === 'succeed') return 'success';
+    return 'active';
+  }, [chartDetail?.status]);
+
+  const nextRefreshInSec = useMemo(() => {
+    if (!chartDetail || chartDetail.status === 'succeed' || chartDetail.status === 'failed') return 0;
+    return POLL_INTERVAL_MS / 1000;
+  }, [chartDetail, POLL_INTERVAL_MS]);
+
   const stopPolling = () => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = undefined;
     }
+    if (countdownTimerRef.current) {
+      clearInterval(countdownTimerRef.current);
+      countdownTimerRef.current = undefined;
+    }
+    setCountdown(0);
   };
 
   const resetPollingState = () => {
@@ -126,9 +156,14 @@ const AddChartAsync: React.FC = () => {
     stopPolling();
     resetPollingState();
     fetchChartDetail(id);
+    setCountdown(POLL_INTERVAL_MS / 1000);
     timerRef.current = setInterval(() => {
+      setCountdown(POLL_INTERVAL_MS / 1000);
       fetchChartDetail(id);
     }, POLL_INTERVAL_MS);
+    countdownTimerRef.current = setInterval(() => {
+      setCountdown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
   };
 
   useEffect(() => {
@@ -179,7 +214,20 @@ const AddChartAsync: React.FC = () => {
           status="info"
           title={statusText}
           subTitle={chartDetail.execMessage || '系统正在努力分析中，请稍候...'}
-          extra={<Button onClick={() => chartId && fetchChartDetail(chartId)}>立即刷新</Button>}
+          extra={
+            <Space direction="vertical" size={8} style={{ width: 360, maxWidth: '100%' }}>
+              <Progress
+                percent={progressPercent}
+                status={progressStatus as 'active' | 'success' | 'exception'}
+                format={() => `${progressPercent}%`}
+              />
+              <Space>
+                <Button onClick={() => chartId && fetchChartDetail(chartId)}>立即刷新</Button>
+                <Tag color="blue">下次自动刷新：{countdown}s</Tag>
+                <Tag color="processing">已轮询：{pollCountRef.current}/{MAX_RETRY}</Tag>
+              </Space>
+            </Space>
+          }
         />
       );
     }
@@ -277,6 +325,15 @@ const AddChartAsync: React.FC = () => {
       </Card>
 
       <Card style={{ marginTop: 16 }} title="任务轨迹（Agent Timeline）">
+        {chartId ? (
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginBottom: 12 }}
+            message={`任务 #${chartId} · 当前状态：${statusText}`}
+            description={`轮询进度 ${pollCountRef.current}/${MAX_RETRY}${nextRefreshInSec ? `，预计 ${countdown}s 后自动刷新` : ''}`}
+          />
+        ) : null}
         {events.length === 0 ? <Alert type="info" showIcon message="任务开始后会自动记录执行轨迹" /> : <Steps direction="vertical" items={timelineItems} />}
         <Divider style={{ margin: '12px 0' }} />
         {renderResult()}
