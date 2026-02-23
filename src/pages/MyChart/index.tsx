@@ -97,12 +97,7 @@ const truncateText = (text: string, maxLength = 120): string => {
   return `${text.slice(0, maxLength)}...`;
 };
 
-const getFailurePreviewLength = (): number => {
-  if (typeof window === 'undefined') {
-    return 88;
-  }
-  return window.innerWidth <= 768 ? 48 : 88;
-};
+const getFailurePreviewLength = (isMobile: boolean): number => (isMobile ? 48 : 88);
 
 /**
  * 我的图表页面
@@ -468,7 +463,7 @@ const MyChartPage: React.FC = () => {
                     <Card type="inner" size="small" title="失败原因" style={{ marginBottom: 8 }}>
                       {(() => {
                         const fullMessage = item.execMessage || '暂无详细错误信息，请稍后重试';
-                        const previewLength = getFailurePreviewLength();
+                        const previewLength = getFailurePreviewLength(isMobile);
                         const previewMessage = truncateText(fullMessage, previewLength);
                         const needsExpand = fullMessage.length > previewLength;
                         const expanded = item.id ? !!expandedFailureIds[item.id] : false;
