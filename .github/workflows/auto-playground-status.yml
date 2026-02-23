@@ -15,6 +15,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -22,10 +24,24 @@ jobs:
           python-version: '3.x'
 
       - name: Update status board
-        run: python scripts/update_playground_status.py
+        run: |
+          python scripts/update_playground_status.py
+          cp PLAYGROUND_STATUS.md /tmp/PLAYGROUND_STATUS.md
+          git restore --source=HEAD --worktree --staged PLAYGROUND_STATUS.md || true
 
       - name: Commit status board
         run: |
+          TARGET_BRANCH="playground-status/live"
+
+          git fetch origin "${TARGET_BRANCH}" || true
+          if git show-ref --verify --quiet "refs/remotes/origin/${TARGET_BRANCH}"; then
+            git checkout -B "${TARGET_BRANCH}" "origin/${TARGET_BRANCH}"
+          else
+            git checkout -B "${TARGET_BRANCH}"
+          fi
+
+          cp /tmp/PLAYGROUND_STATUS.md PLAYGROUND_STATUS.md
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add PLAYGROUND_STATUS.md
@@ -33,5 +49,6 @@ jobs:
             echo "No status changes"
             exit 0
           fi
+
           git commit -m "chore(status): auto refresh playground board [skip ci]"
-          git push
+          git push origin "${TARGET_BRANCH}"
