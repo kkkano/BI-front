@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   Col,
+  Collapse,
   Empty,
   List,
   message,
@@ -21,8 +22,10 @@ import {
 import ReactECharts from 'echarts-for-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Search from 'antd/es/input/Search';
+import type { ECharts } from 'echarts';
 
 const { Text } = Typography;
+const FAILURE_REASON_COLLAPSE_KEY = 'failure-reason';
 
 const STATUS_CONFIG: Record<string, { color: string; label: string; shortLabel: string }> = {
   wait: { color: 'warning', label: '待生成', shortLabel: '待' },
@@ -93,6 +96,13 @@ const truncateText = (text: string, maxLength = 120): string => {
   return `${text.slice(0, maxLength)}...`;
 };
 
+const getFailurePreviewLength = (): number => {
+  if (typeof window === 'undefined') {
+    return 88;
+  }
+  return window.innerWidth <= 768 ? 56 : 88;
+};
+
 /**
  * 我的图表页面
  */
@@ -113,9 +123,12 @@ const MyChartPage: React.FC = () => {
   const [deletingId, setDeletingId] = useState<number | undefined>();
   const [previewChart, setPreviewChart] = useState<{ title: string; option: object } | null>(null);
   const [previewLoadingId, setPreviewLoadingId] = useState<number | undefined>();
+  const [failureDetail, setFailureDetail] = useState<{ title: string; message: string } | null>(null);
+  const [expandedFailureIds, setExpandedFailureIds] = useState<Record<number, boolean>>({});
   const [statusFilter, setStatusFilter] = useState<'all' | 'wait' | 'running' | 'succeed' | 'failed'>(
     'all',
   );
+  const previewInstanceRef = useRef<ECharts | null>(null);
   const pollingRequestingRef = useRef(false);
 
   const hasPendingCharts = useMemo(
@@ -195,13 +208,26 @@ const MyChartPage: React.FC = () => {
 
   const openChartPreview = (item: API.Chart, parsedChartOption: object) => {
     setPreviewLoadingId(item.id);
-    window.setTimeout(() => {
-      setPreviewChart({
-        title: item.name || '未命名图表',
-        option: parsedChartOption,
-      });
-      setPreviewLoadingId(undefined);
-    }, 80);
+    setPreviewChart({
+      title: item.name || '未命名图表',
+      option: parsedChartOption,
+    });
+    setPreviewLoadingId(undefined);
+  };
+
+  const openFailureDetail = (item: API.Chart) => {
+    setFailureDetail({
+      title: item.name || '未命名图表',
+      message: item.execMessage || '暂无详细错误信息，请稍后重试',
+    });
+  };
+
+  const handleFailureCollapseChange = (id: number, keys: string | string[]) => {
+    const normalizedKeys = Array.isArray(keys) ? keys : [keys];
+    setExpandedFailureIds((prev) => ({
+      ...prev,
+      [id]: normalizedKeys.includes(FAILURE_REASON_COLLAPSE_KEY),
+    }));
   };
 
   const renderChartPreview = (item: API.Chart, parsedChartOption?: object) => {
@@ -434,23 +460,90 @@ const MyChartPage: React.FC = () => {
                       style={{ padding: '16px 0 8px' }}
                     />
                     <Card type="inner" size="small" title="失败原因" style={{ marginBottom: 8 }}>
-                      <Text
-                        type="danger"
-                        style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.7 }}
-                      >
-                        {item.execMessage
-                          ? truncateText(item.execMessage, 88)
-                          : '暂无详细错误信息，请稍后重试'}
-                      </Text>
-                      {item.execMessage && item.execMessage.length > 88 && (
-                        <div style={{ marginTop: 8 }}>
-                          <Tooltip title={<div style={{ whiteSpace: 'pre-wrap' }}>{item.execMessage}</div>}>
-                            <Button type="link" size="small" style={{ padding: 0 }}>
-                              查看完整错误
-                            </Button>
-                          </Tooltip>
-                        </div>
-                      )}
+                      {(() => {
+                        const fullMessage = item.execMessage || '暂无详细错误信息，请稍后重试';
+                        const previewLength = getFailurePreviewLength();
+                        const previewMessage = truncateText(fullMessage, previewLength);
+                        const needsExpand = fullMessage.length > previewLength;
+                        const expanded = item.id ? !!expandedFailureIds[item.id] : false;
+
+                        return (
+                          <>
+                            <Text
+                              type="danger"
+                              style={{
+                                whiteSpace: expanded ? 'pre-wrap' : 'normal',
+                                wordBreak: 'break-word',
+                                lineHeight: 1.7,
+                              }}
+                            >
+                              {expanded ? fullMessage : previewMessage}
+                            </Text>
+                            {needsExpand && item.id && (
+                              <>
+                                <div style={{ marginTop: 8 }}>
+                                  <Text type="secondary" style={{ fontSize: 12 }}>
+                                    鼠标悬停可快速查看完整错误，点击可展开固定。
+                                  </Text>
+                                </div>
+                                <div style={{ marginTop: 8 }}>
+                                  <Tooltip
+                                    placement="topLeft"
+                                    title={
+                                      <div
+                                        style={{
+                                          maxWidth: 360,
+                                          whiteSpace: 'pre-wrap',
+                                          wordBreak: 'break-word',
+                                          lineHeight: 1.6,
+                                        }}
+                                      >
+                                        {fullMessage}
+                                      </div>
+                                    }
+                                  >
+                                    <Button
+                                      type="link"
+                                      size="small"
+                                      style={{ padding: 0 }}
+                                      onClick={() => openFailureDetail(item)}
+                                    >
+                                      悬停查看完整错误
+                                    </Button>
+                                  </Tooltip>
+                                </div>
+                                <div style={{ marginTop: 8 }}>
+                                  <Collapse
+                                    size="small"
+                                    bordered={false}
+                                    activeKey={expanded ? [FAILURE_REASON_COLLAPSE_KEY] : []}
+                                    onChange={(keys) => handleFailureCollapseChange(item.id as number, keys)}
+                                    items={[
+                                      {
+                                        key: FAILURE_REASON_COLLAPSE_KEY,
+                                        label: expanded ? '收起失败原因' : '展开失败原因（移动端推荐）',
+                                        children: (
+                                          <Text
+                                            type="danger"
+                                            style={{
+                                              display: 'block',
+                                              whiteSpace: 'pre-wrap',
+                                              wordBreak: 'break-word',
+                                              lineHeight: 1.8,
+                                            }}
+                                          >
+                                            {fullMessage}
+                                          </Text>
+                                        ),
+                                      },
+                                    ]}
+                                  />
+                                </div>
+                              </>
+                            )}
+                          </>
+                        );
+                      })()}
                     </Card>
                     <Space size={6} wrap>
                       <Tag color="error" bordered={false}>
@@ -474,17 +567,47 @@ const MyChartPage: React.FC = () => {
         footer={null}
         width="80vw"
         onCancel={() => setPreviewChart(null)}
+        afterOpenChange={(open) => {
+          if (open) {
+            window.setTimeout(() => {
+              previewInstanceRef.current?.resize();
+            }, 0);
+          }
+        }}
         destroyOnClose
       >
         <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
-          鼠标滚轮可缩放页面，便于查看细节
+          支持滚轮缩放页面；按 ESC 可快速关闭预览
         </Text>
         {previewChart && (
           <ReactECharts
             option={previewChart.option}
+            onChartReady={(instance) => {
+              previewInstanceRef.current = instance;
+            }}
             style={{ height: '60vh', minHeight: 420 }}
           />
         )}
+      </Modal>
+
+      <Modal
+        open={!!failureDetail}
+        title={`${failureDetail?.title || ''} · 失败详情`}
+        footer={null}
+        onCancel={() => setFailureDetail(null)}
+        destroyOnClose
+      >
+        <Card type="inner" size="small" title="失败原因">
+          <Text
+            type="danger"
+            style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.8 }}
+          >
+            {failureDetail?.message}
+          </Text>
+        </Card>
+        <Text type="secondary" style={{ display: 'block', marginTop: 12 }}>
+          建议先检查数据字段完整性、分析目标描述和图表类型后再重试。
+        </Text>
       </Modal>
     </div>
   );
