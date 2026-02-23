@@ -9,7 +9,6 @@ import {
   Form,
   Input,
   message,
-  Progress,
   Result,
   Select,
   Space,
@@ -17,11 +16,12 @@ import {
   Tag,
   Upload,
 } from 'antd';
+import { useForm } from 'antd/es/form/Form';
 import TextArea from 'antd/es/input/TextArea';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { buildFailureHint, getTaskStatusText } from '../AddChartAsync/statusCopy';
-import { useForm } from 'antd/es/form/Form';
 import ReactECharts from 'echarts-for-react';
+import TaskProgressPanel from './components/TaskProgressPanel';
+import { buildFailureHint, getTaskStatusText } from '../AddChartAsync/statusCopy';
 
 type TaskEvent = {
   status: string;
@@ -42,6 +42,9 @@ const AddChartAsync: React.FC = () => {
   const [countdown, setCountdown] = useState<number>(0);
   const [pollTimeoutReached, setPollTimeoutReached] = useState<boolean>(false);
   const [manualRefreshing, setManualRefreshing] = useState<boolean>(false);
+  const [pollCount, setPollCount] = useState<number>(0);
+  const [lastPolledAt, setLastPolledAt] = useState<string>('');
+  const [pollError, setPollError] = useState<string>('');
 
   const timerRef = useRef<NodeJS.Timeout>();
   const countdownTimerRef = useRef<NodeJS.Timeout>();
@@ -61,34 +64,29 @@ const AddChartAsync: React.FC = () => {
     if (!chartId) return '提交任务后，系统会自动追踪分析进度';
     if (pollTimeoutReached)
       return '自动追踪已超时。你可以点击“重试自动追踪”继续获取结果，或前往“我的图表”稍后查看';
+    if (pollError) return pollError;
     if (chartDetail?.status === 'wait') return '任务已入队，系统正在等待可用计算资源';
     if (chartDetail?.status === 'running') return '任务执行中，可随时点击“立即刷新”获取最新进度';
     if (chartDetail?.status === 'succeed') return '图表已生成完成，建议前往“我的图表”查看详情';
     if (chartDetail?.status === 'failed') return buildFailureHint(chartDetail.execMessage);
     return '系统正在处理中，请稍候';
-  }, [chartDetail?.execMessage, chartDetail?.status, chartId, pollTimeoutReached]);
+  }, [chartDetail?.execMessage, chartDetail?.status, chartId, pollError, pollTimeoutReached]);
 
   const progressPercent = useMemo(() => {
     const status = chartDetail?.status;
-    if (status === 'succeed') return 100;
-    if (status === 'failed') return 100;
+    if (status === 'succeed' || status === 'failed') return 100;
     if (status === 'running') return 60;
     if (status === 'wait') return 20;
     if (!chartId) return 0;
-    const base = Math.min((pollCountRef.current / MAX_RETRY) * 80, 80);
+    const base = Math.min((pollCount / MAX_RETRY) * 80, 80);
     return Math.round(base);
-  }, [chartDetail?.status, chartId]);
+  }, [chartDetail?.status, chartId, pollCount]);
 
   const progressStatus = useMemo(() => {
     if (chartDetail?.status === 'failed') return 'exception';
     if (chartDetail?.status === 'succeed') return 'success';
     return 'active';
   }, [chartDetail?.status]);
-
-  const nextRefreshInSec = useMemo(() => {
-    if (!chartDetail || chartDetail.status === 'succeed' || chartDetail.status === 'failed') return 0;
-    return POLL_INTERVAL_MS / 1000;
-  }, [chartDetail, POLL_INTERVAL_MS]);
 
   const stopPolling = () => {
     if (timerRef.current) {
@@ -105,12 +103,15 @@ const AddChartAsync: React.FC = () => {
   const resetPollingState = () => {
     pollCountRef.current = 0;
     errorCountRef.current = 0;
+    setPollCount(0);
+    setLastPolledAt('');
+    setPollError('');
     setPollTimeoutReached(false);
   };
 
   const addEvent = (status: string, text: string) => {
     setEvents((prev) => {
-      if (prev.length > 0 && prev[prev.length - 1].status === status) {
+      if (prev.length > 0 && prev[prev.length - 1].status === status && prev[prev.length - 1].text === text) {
         return prev;
       }
       return [
@@ -126,10 +127,12 @@ const AddChartAsync: React.FC = () => {
 
   const fetchChartDetail = async (id: number, source: 'auto' | 'manual' = 'auto') => {
     if (source === 'auto' && pollCountRef.current >= MAX_RETRY) {
+      const timeoutMessage = '自动追踪超时：已达到最大查询次数。你可以重试自动追踪，或稍后在“我的图表”查看最终结果';
       stopPolling();
       setPollTimeoutReached(true);
-      addEvent('timeout', '自动追踪超时：已达到最大查询次数。你可以重试自动追踪，或稍后在“我的图表”查看最终结果');
-      message.warning('自动追踪超时：已达到最大查询次数。你可以重试自动追踪，或稍后在“我的图表”查看最终结果');
+      setPollError(timeoutMessage);
+      addEvent('timeout', timeoutMessage);
+      message.warning(timeoutMessage);
       return;
     }
 
@@ -139,35 +142,52 @@ const AddChartAsync: React.FC = () => {
     }
 
     pollCountRef.current += 1;
+    setPollCount(pollCountRef.current);
 
     try {
       const res = await getChartTaskStatusUsingGET({ chartId: id });
-      if (res?.data) {
-        errorCountRef.current = 0;
-        setChartDetail(res.data);
+      setLastPolledAt(new Date().toLocaleTimeString('zh-CN', { hour12: false }));
 
-        if (res.data.status) {
-          addEvent(res.data.status, res.data.execMessage || getStatusLabel(res.data.status));
+      if (!res?.data) {
+        const emptyMessage = '状态查询成功，但未返回任务详情，请稍后重试';
+        setPollError(emptyMessage);
+        addEvent('empty', emptyMessage);
+        return;
+      }
+
+      errorCountRef.current = 0;
+      setChartDetail(res.data);
+      setPollError('');
+
+      if (res.data.status) {
+        addEvent(res.data.status, res.data.execMessage || getStatusLabel(res.data.status));
+      }
+
+      if (res.data.status === 'succeed' || res.data.status === 'failed') {
+        stopPolling();
+        if (res.data.status === 'succeed') {
+          message.success('图表分析完成，可前往“我的图表”查看');
+        } else {
+          setPollError(buildFailureHint(res.data.execMessage));
         }
-
-        if (res.data.status === 'succeed' || res.data.status === 'failed') {
-          stopPolling();
-          if (res.data.status === 'succeed') {
-            message.success('图表分析完成，可前往“我的图表”查看');
-          }
-          return;
-        }
-
       }
     } catch (e: any) {
       errorCountRef.current += 1;
+      setLastPolledAt(new Date().toLocaleTimeString('zh-CN', { hour12: false }));
+
+      const errorMessage =
+        errorCountRef.current >= MAX_RETRY
+          ? '状态查询连续失败次数过多，已暂停自动追踪，请稍后手动刷新'
+          : `状态查询失败（连续 ${errorCountRef.current}/${MAX_RETRY} 次）：${e?.message || '未知错误'}`;
+
+      setPollError(errorMessage);
 
       if (errorCountRef.current >= MAX_RETRY) {
         stopPolling();
-        addEvent('error', '状态查询连续失败次数过多，已暂停自动追踪，请稍后手动刷新');
-        message.error('状态查询连续失败次数过多，已暂停自动追踪，请稍后手动刷新');
+        addEvent('error', errorMessage);
+        message.error(errorMessage);
       } else {
-        message.warning(`状态查询失败（连续 ${errorCountRef.current}/${MAX_RETRY} 次），系统将继续自动重试`);
+        addEvent('warning', errorMessage);
       }
     } finally {
       if (source === 'manual') {
@@ -181,10 +201,12 @@ const AddChartAsync: React.FC = () => {
     resetPollingState();
     fetchChartDetail(id);
     setCountdown(POLL_INTERVAL_MS / 1000);
+
     timerRef.current = setInterval(() => {
       setCountdown(POLL_INTERVAL_MS / 1000);
       fetchChartDetail(id);
     }, POLL_INTERVAL_MS);
+
     countdownTimerRef.current = setInterval(() => {
       setCountdown((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
@@ -196,12 +218,14 @@ const AddChartAsync: React.FC = () => {
 
   const onRetryAutoPolling = () => {
     if (!chartId || isTerminalStatus || manualRefreshing) return;
+    setPollError('');
     startPolling(chartId);
     message.success('已恢复自动追踪，请稍候查看最新状态');
   };
 
   const onFinish = async (values: any) => {
     if (submitting) return;
+
     setSubmitting(true);
     setChartId(undefined);
     setChartDetail(undefined);
@@ -215,11 +239,18 @@ const AddChartAsync: React.FC = () => {
     };
 
     try {
-      const res = await genChartByAiAsyncMqUsingPOST(params, {}, values.file.file.originFileObj);
+      const originFile = values?.file?.file?.originFileObj;
+      if (!originFile) {
+        message.error('请上传数据文件');
+        return;
+      }
+
+      const res = await genChartByAiAsyncMqUsingPOST(params, {}, originFile);
       if (!res?.data?.chartId) {
         message.error('分析任务提交失败');
         return;
       }
+
       const id = res.data.chartId;
       setChartId(id);
       addEvent('submitted', `任务 #${id} 已提交`);
@@ -235,45 +266,26 @@ const AddChartAsync: React.FC = () => {
 
   const renderResult = () => {
     if (!chartDetail) {
-      return <Alert type="info" showIcon message={hintText} />;
+      return <Alert type={pollError ? 'warning' : 'info'} showIcon message={pollError || hintText} />;
     }
 
     if (chartDetail.status === 'wait' || chartDetail.status === 'running') {
       return (
-        <Result
-          status="info"
-          title={statusText}
-          subTitle={chartDetail.execMessage || '系统正在努力分析中，请稍候...'}
-          extra={
-            <Space direction="vertical" size={8} style={{ width: 360, maxWidth: '100%' }}>
-              <Progress
-                percent={progressPercent}
-                status={progressStatus as 'active' | 'success' | 'exception'}
-                format={() => `${progressPercent}%`}
-              />
-              <Space wrap>
-                <Button
-                  onClick={() => chartId && fetchChartDetail(chartId, 'manual')}
-                  loading={manualRefreshing}
-                  disabled={isTerminalStatus || manualRefreshing}
-                >
-                  立即刷新
-                </Button>
-                {pollTimeoutReached ? (
-                  <Button type="primary" onClick={onRetryAutoPolling} disabled={isTerminalStatus || manualRefreshing}>
-                    重试自动追踪
-                  </Button>
-                ) : null}
-                {!isTerminalStatus ? (
-                  <Tag color={countdown <= 3 ? 'orange' : 'blue'}>
-                    下次自动刷新：{manualRefreshing ? '同步中...' : `${countdown}s`}
-                  </Tag>
-                ) : null}
-                <Tag color="processing">已查询：{pollCountRef.current}/{MAX_RETRY}</Tag>
-              </Space>
-              <Alert showIcon type={pollTimeoutReached ? 'warning' : 'info'} message={hintText} />
-            </Space>
-          }
+        <TaskProgressPanel
+          statusText={statusText}
+          progressPercent={progressPercent}
+          progressStatus={progressStatus}
+          countdown={countdown}
+          manualRefreshing={manualRefreshing}
+          isTerminalStatus={isTerminalStatus}
+          pollTimeoutReached={pollTimeoutReached}
+          pollCount={pollCount}
+          maxRetry={MAX_RETRY}
+          hintText={hintText}
+          pollError={pollError}
+          lastPolledAt={lastPolledAt}
+          onManualRefresh={() => chartId && fetchChartDetail(chartId, 'manual')}
+          onRetryAutoPolling={onRetryAutoPolling}
         />
       );
     }
@@ -373,14 +385,18 @@ const AddChartAsync: React.FC = () => {
       <Card style={{ marginTop: 16 }} title="任务轨迹（Agent Timeline）">
         {chartId ? (
           <Alert
-            type="info"
+            type={pollError ? 'warning' : 'info'}
             showIcon
             style={{ marginBottom: 12 }}
             message={`任务 #${chartId} · 当前状态：${statusText}`}
-            description={`轮询进度 ${pollCountRef.current}/${MAX_RETRY}${nextRefreshInSec ? `，预计 ${countdown}s 后自动刷新` : ''}`}
+            description={`轮询进度 ${pollCount}/${MAX_RETRY}${!isTerminalStatus ? `，预计 ${countdown}s 后自动刷新` : ''}${lastPolledAt ? `，最近查询 ${lastPolledAt}` : ''}`}
           />
         ) : null}
-        {events.length === 0 ? <Alert type="info" showIcon message="任务开始后会自动记录执行轨迹" /> : <Steps direction="vertical" items={timelineItems} />}
+        {events.length === 0 ? (
+          <Alert type="info" showIcon message="任务开始后会自动记录执行轨迹" />
+        ) : (
+          <Steps direction="vertical" items={timelineItems} />
+        )}
         <Divider style={{ margin: '12px 0' }} />
         {renderResult()}
       </Card>
