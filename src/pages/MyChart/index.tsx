@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   Col,
+  Empty,
   List,
   message,
   Modal,
@@ -29,6 +30,19 @@ const STATUS_CONFIG: Record<string, { color: string; label: string }> = {
 };
 
 const POLLING_INTERVAL = 5000;
+
+const statusToResultStatus = (status?: string): 'warning' | 'info' | 'success' | 'error' => {
+  if (status === 'wait') {
+    return 'warning';
+  }
+  if (status === 'running') {
+    return 'info';
+  }
+  if (status === 'succeed') {
+    return 'success';
+  }
+  return 'error';
+};
 
 const isValidJson = (str: string): boolean => {
   try {
@@ -138,21 +152,73 @@ const MyChartPage: React.FC = () => {
     setDeletingId(undefined);
   };
 
-  return (
-    <div className="my-chart-page">
-      <Search
-        placeholder="请输入图表名称"
-        enterButton="搜索"
-        allowClear
-        loading={loading}
-        onSearch={(value) =>
-          setSearchParams({
-            ...initSearchParams,
-            name: value || undefined,
+  const renderChartPreview = (item: API.Chart, parsedChartOption?: object) => {
+    if (!parsedChartOption) {
+      return (
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description="图表配置有误，暂无法预览"
+          style={{ margin: '12px 0 8px' }}
+        />
+      );
+    }
+
+    return (
+      <div
+        role="button"
+        tabIndex={0}
+        style={{ cursor: 'zoom-in' }}
+        onClick={() =>
+          setPreviewChart({
+            title: item.name || '未命名图表',
+            option: parsedChartOption,
           })
         }
-      />
-      <div style={{ marginTop: 16 }} />
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setPreviewChart({
+              title: item.name || '未命名图表',
+              option: parsedChartOption,
+            });
+          }
+        }}
+      >
+        <ReactECharts option={parsedChartOption} style={{ height: 280 }} />
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          点击图表可放大查看
+        </Text>
+      </div>
+    );
+  };
+
+  return (
+    <div className="my-chart-page">
+      <Card bordered={false} style={{ marginBottom: 16 }}>
+        <Row gutter={[12, 12]} align="middle" justify="space-between">
+          <Col xs={24} md={14}>
+            <Text strong style={{ fontSize: 16 }}>
+              我的图表
+            </Text>
+            <br />
+            <Text type="secondary">支持按名称检索，待生成图表会自动刷新状态</Text>
+          </Col>
+          <Col xs={24} md={10}>
+            <Search
+              placeholder="请输入图表名称"
+              enterButton="搜索"
+              allowClear
+              loading={loading}
+              onSearch={(value) =>
+                setSearchParams({
+                  ...initSearchParams,
+                  name: value || undefined,
+                })
+              }
+            />
+          </Col>
+        </Row>
+      </Card>
       <List
         grid={{ gutter: 16, xs: 1, sm: 1, md: 1, lg: 2, xl: 2, xxl: 2 }}
         pagination={{
@@ -241,67 +307,38 @@ const MyChartPage: React.FC = () => {
                   </div>
                 )}
 
-                {item.status === 'wait' && (
+                {(item.status === 'wait' || item.status === 'running') && (
                   <Result
-                    status="warning"
-                    title="待生成"
-                    subTitle={item.execMessage ?? '当前图表生成队列繁忙，请耐心等候'}
-                    style={{ padding: '16px 0' }}
-                  />
-                )}
-                {item.status === 'running' && (
-                  <Result
-                    status="info"
-                    title="图表生成中"
-                    subTitle={item.execMessage ?? '正在分析数据，请稍候...'}
+                    status={statusToResultStatus(item.status)}
+                    title={item.status === 'wait' ? '待生成' : '图表生成中'}
+                    subTitle={
+                      item.execMessage ??
+                      (item.status === 'wait'
+                        ? '当前图表生成队列繁忙，请耐心等候'
+                        : '正在分析数据，请稍候...')
+                    }
                     style={{ padding: '16px 0' }}
                   />
                 )}
                 {item.status === 'succeed' && (
                   <>
-                    {item.genResult && (
-                      <Card
-                        type="inner"
-                        size="small"
-                        title="分析结论"
-                        style={{ marginBottom: 12 }}
-                      >
-                        <Text>{item.genResult}</Text>
-                      </Card>
-                    )}
-                    {parsedChartOption && (
-                      <div
-                        role="button"
-                        tabIndex={0}
-                        style={{ cursor: 'zoom-in' }}
-                        onClick={() =>
-                          setPreviewChart({
-                            title: item.name || '未命名图表',
-                            option: parsedChartOption,
-                          })
-                        }
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            setPreviewChart({
-                              title: item.name || '未命名图表',
-                              option: parsedChartOption,
-                            });
-                          }
-                        }}
-                      >
-                        <ReactECharts option={parsedChartOption} style={{ height: 280 }} />
-                        <Text type="secondary" style={{ fontSize: 12 }}>
-                          点击图表可放大查看
-                        </Text>
-                      </div>
-                    )}
+                    <Card
+                      type="inner"
+                      size="small"
+                      title="分析结论"
+                      style={{ marginBottom: 12 }}
+                    >
+                      <Text>
+                        {item.genResult ?? '暂无分析结论，建议返回 AddChart 重新生成以补充内容'}
+                      </Text>
+                    </Card>
+                    {renderChartPreview(item, parsedChartOption)}
                   </>
                 )}
                 {item.status === 'failed' && (
                   <>
                     <Result
-                      status="error"
+                      status={statusToResultStatus(item.status)}
                       title="图表生成失败"
                       subTitle="请根据失败原因调整后重试"
                       style={{ padding: '16px 0 8px' }}
