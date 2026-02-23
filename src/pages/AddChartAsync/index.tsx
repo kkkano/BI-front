@@ -1,3 +1,4 @@
+import { useChartTaskPolling } from '@/hooks/useChartTaskPolling';
 import {
   genChartByAiAsyncUsingPOST,
   getChartTaskStatusUsingGET,
@@ -32,7 +33,7 @@ import type { UploadProps } from 'antd';
 import { useForm } from 'antd/es/form/Form';
 import TextArea from 'antd/es/input/TextArea';
 import type { EChartsOption } from 'echarts';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import ReactECharts from 'echarts-for-react';
 import { history } from '@umijs/max';
 import {
@@ -49,7 +50,6 @@ type TaskEvent = {
 };
 
 type TaskStatus = 'idle' | 'wait' | 'running' | 'succeed' | 'failed';
-type PollSource = 'auto' | 'manual';
 
 type AddChartFormValues = {
   goal: string;
@@ -96,8 +96,6 @@ const toTaskStatus = (status?: string): TaskStatus => {
   return 'running';
 };
 
-const getCurrentTime = (): string => new Date().toLocaleTimeString('zh-CN', { hour12: false });
-
 /**
  * 添加图表（异步 线程池）页面
  * 优化点：
@@ -113,26 +111,115 @@ const AddChartAsync: React.FC = () => {
   const [status, setStatus] = useState<TaskStatus>('idle');
   const [execMessage, setExecMessage] = useState<string>('');
   const [events, setEvents] = useState<TaskEvent[]>([]);
-  const [countdown, setCountdown] = useState<number>(0);
-  const [pollCount, setPollCount] = useState<number>(0);
-  const [pollError, setPollError] = useState<string>('');
-  const [lastPolledAt, setLastPolledAt] = useState<string>('');
-  const [manualRefreshing, setManualRefreshing] = useState<boolean>(false);
-  const [pollTimeoutReached, setPollTimeoutReached] = useState<boolean>(false);
-  const [pollPausedByError, setPollPausedByError] = useState<boolean>(false);
   const [lastSubmitValues, setLastSubmitValues] = useState<AddChartFormValues>();
-
-  const timerRef = useRef<ReturnType<typeof setInterval>>();
-  const countdownTimerRef = useRef<ReturnType<typeof setInterval>>();
-  const pollCountRef = useRef<number>(0);
-  const consecutiveErrorRef = useRef<number>(0);
 
   const POLL_INTERVAL_MS = 15 * 1000;
   const MAX_RETRY = 40;
   const MAX_CONSECUTIVE_ERRORS = 5;
 
-  const statusText = useMemo(() => getTaskStatusText(status), [status]);
+  const addEvent = (eventStatus: string, text: string) => {
+    setEvents((prev) => {
+      if (
+        prev.length > 0 &&
+        prev[prev.length - 1].status === eventStatus &&
+        prev[prev.length - 1].text === text
+      ) {
+        return prev;
+      }
 
+      return [
+        ...prev,
+        {
+          status: eventStatus,
+          text,
+          at: new Date().toLocaleString('zh-CN', { hour12: false }),
+        },
+      ];
+    });
+  };
+
+  const {
+    countdown,
+    pollCount,
+    pollError,
+    lastPolledAt,
+    manualRefreshing,
+    pollTimeoutReached,
+    pollPausedByError,
+    startPolling,
+    stopPolling,
+    resetPollingState,
+    pollNow,
+    retryAutoPolling,
+  } = useChartTaskPolling<API.ChartTaskStatusVO>({
+    pollIntervalMs: POLL_INTERVAL_MS,
+    maxRetry: MAX_RETRY,
+    maxConsecutiveErrors: MAX_CONSECUTIVE_ERRORS,
+    fetchStatus: async (id) => {
+      const res = await getChartTaskStatusUsingGET({ chartId: id });
+      return res?.data;
+    },
+    isTerminalStatus: (data) => isTerminalTaskStatus(data.status),
+    onData: (data) => {
+      const nextStatus = toTaskStatus(data.status);
+      const nextExecMessage = data.execMessage || '';
+
+      setChartDetail(data);
+      setStatus(nextStatus);
+      setExecMessage(nextExecMessage);
+
+      if (data.status) {
+        const eventText =
+          data.status === 'failed'
+            ? buildFailureHint(nextExecMessage)
+            : nextExecMessage || getTaskStatusText(data.status);
+        addEvent(data.status, eventText);
+      }
+    },
+    onTerminal: (data) => {
+      if (data.status === 'succeed') {
+        message.success('图表分析完成，可前往“我的图表”查看');
+      }
+    },
+    formatEmptyMessage: () => ({
+      message: '状态查询成功，但未返回任务详情，请稍后重试',
+    }),
+    formatTimeoutMessage: () =>
+      '自动追踪超时：已达到最大查询次数。你可以重试自动追踪，或稍后在“我的图表”查看最终结果',
+    formatErrorMessage: (error, context) => {
+      const errMsg = getErrorMessage(error);
+      if (context.paused) {
+        return {
+          message: '状态查询连续失败次数过多，已暂停自动追踪，请稍后手动刷新',
+        };
+      }
+      return {
+        message: `状态查询失败（连续 ${context.consecutiveErrorCount}/${context.maxConsecutiveErrors} 次）：${errMsg}`,
+      };
+    },
+    onTimeout: (timeoutMessage) => {
+      addEvent('timeout', timeoutMessage);
+    },
+    onEmpty: ({ message: emptyMessage }) => {
+      addEvent('empty', emptyMessage);
+    },
+    onError: ({ message: errorMessage, paused }) => {
+      addEvent(paused ? 'error' : 'warning', errorMessage);
+      if (paused) {
+        message.error(errorMessage);
+      }
+    },
+    onResume: ({ reason }) => {
+      const retryText =
+        reason === 'timeout'
+          ? '已重试自动追踪，请稍候查看最新状态'
+          : '已恢复自动追踪，请稍候查看最新状态';
+      addEvent('retry', retryText);
+      message.success(retryText);
+    },
+  });
+
+  const statusText = useMemo(() => getTaskStatusText(status), [status]);
   const isTerminalStatus = isTerminalTaskStatus(status);
 
   const progressPercent = useMemo(() => {
@@ -165,174 +252,9 @@ const AddChartAsync: React.FC = () => {
     return false;
   };
 
-  const addEvent = (eventStatus: string, text: string) => {
-    setEvents((prev) => {
-      if (
-        prev.length > 0 &&
-        prev[prev.length - 1].status === eventStatus &&
-        prev[prev.length - 1].text === text
-      ) {
-        return prev;
-      }
-
-      return [
-        ...prev,
-        {
-          status: eventStatus,
-          text,
-          at: new Date().toLocaleString('zh-CN', { hour12: false }),
-        },
-      ];
-    });
-  };
-
-  const stopPolling = () => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = undefined;
-    }
-    if (countdownTimerRef.current) {
-      clearInterval(countdownTimerRef.current);
-      countdownTimerRef.current = undefined;
-    }
-    setCountdown(0);
-  };
-
-  const resetPollingMeta = () => {
-    pollCountRef.current = 0;
-    consecutiveErrorRef.current = 0;
-    setPollCount(0);
-    setLastPolledAt('');
-    setPollError('');
-    setPollTimeoutReached(false);
-    setPollPausedByError(false);
-  };
-
-  const resetCountdown = () => {
-    setCountdown(POLL_INTERVAL_MS / 1000);
-  };
-
-  useEffect(() => {
-    return () => stopPolling();
-  }, []);
-
-  const doFetchChartStatus = async (id: number, source: PollSource = 'auto') => {
-    if (source === 'auto' && pollCountRef.current >= MAX_RETRY) {
-      const timeoutMessage =
-        '自动追踪超时：已达到最大查询次数。你可以重试自动追踪，或稍后在“我的图表”查看最终结果';
-      stopPolling();
-      setPollTimeoutReached(true);
-      setPollPausedByError(false);
-      setPollError(timeoutMessage);
-      addEvent('timeout', timeoutMessage);
-      return;
-    }
-
-    if (source === 'manual') {
-      setManualRefreshing(true);
-      resetCountdown();
-    }
-
-    pollCountRef.current += 1;
-    setPollCount(pollCountRef.current);
-
-    try {
-      const res = await getChartTaskStatusUsingGET({ chartId: id });
-      const data = res?.data;
-      setLastPolledAt(getCurrentTime());
-
-      if (!data) {
-        const emptyMessage = '状态查询成功，但未返回任务详情，请稍后重试';
-        setPollError(emptyMessage);
-        addEvent('empty', emptyMessage);
-        return;
-      }
-
-      const nextStatus = toTaskStatus(data.status);
-      const nextExecMessage = data.execMessage || '';
-
-      consecutiveErrorRef.current = 0;
-      setChartDetail(data);
-      setStatus(nextStatus);
-      setExecMessage(nextExecMessage);
-      setPollPausedByError(false);
-      setPollError('');
-
-      if (data.status) {
-        const eventText =
-          data.status === 'failed'
-            ? buildFailureHint(nextExecMessage)
-            : nextExecMessage || getTaskStatusText(data.status);
-        addEvent(data.status, eventText);
-      }
-
-      if (nextStatus === 'succeed') {
-        stopPolling();
-        message.success('图表分析完成，可前往“我的图表”查看');
-        return;
-      }
-
-      if (nextStatus === 'failed') {
-        stopPolling();
-        setPollError(buildFailureHint(nextExecMessage));
-      }
-    } catch (error: unknown) {
-      consecutiveErrorRef.current += 1;
-      setLastPolledAt(getCurrentTime());
-
-      const errMsg = getErrorMessage(error);
-      const errorMessage =
-        consecutiveErrorRef.current >= MAX_CONSECUTIVE_ERRORS
-          ? '状态查询连续失败次数过多，已暂停自动追踪，请稍后手动刷新'
-          : `状态查询失败（连续 ${consecutiveErrorRef.current}/${MAX_CONSECUTIVE_ERRORS} 次）：${errMsg}`;
-
-      setPollError(errorMessage);
-
-      if (consecutiveErrorRef.current >= MAX_CONSECUTIVE_ERRORS) {
-        stopPolling();
-        setPollPausedByError(true);
-        addEvent('error', errorMessage);
-        message.error(errorMessage);
-      } else {
-        addEvent('warning', errorMessage);
-      }
-    } finally {
-      if (source === 'manual') {
-        setManualRefreshing(false);
-      }
-    }
-  };
-
-  const startPolling = (id: number) => {
-    stopPolling();
-    resetPollingMeta();
-    resetCountdown();
-
-    doFetchChartStatus(id);
-
-    timerRef.current = setInterval(() => {
-      resetCountdown();
-      doFetchChartStatus(id);
-    }, POLL_INTERVAL_MS);
-
-    countdownTimerRef.current = setInterval(() => {
-      setCountdown((prev) => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
-  };
-
   const onRetryAutoPolling = () => {
     if (!chartId || isTerminalStatus || manualRefreshing) return;
-    if (!pollTimeoutReached && !pollPausedByError) return;
-
-    setPollError('');
-    setPollPausedByError(false);
-
-    const retryText = pollTimeoutReached
-      ? '已重试自动追踪，请稍候查看最新状态'
-      : '已恢复自动追踪，请稍候查看最新状态';
-    addEvent('retry', retryText);
-    startPolling(chartId);
-    message.success(retryText);
+    retryAutoPolling(chartId);
   };
 
   const onFinish = async (values: AddChartFormValues) => {
@@ -345,9 +267,8 @@ const AddChartAsync: React.FC = () => {
     setStatus('idle');
     setExecMessage('');
     setEvents([]);
-    setPollError('');
     stopPolling();
-    resetPollingMeta();
+    resetPollingState();
 
     const params: API.genChartByAiAsyncUsingPOSTParams = {
       goal: values.goal,
@@ -474,7 +395,7 @@ const AddChartAsync: React.FC = () => {
             <Progress percent={progressPercent} status="active" />
             <Space wrap>
               <Button
-                onClick={() => chartId && doFetchChartStatus(chartId, 'manual')}
+                onClick={() => pollNow(chartId)}
                 loading={manualRefreshing}
                 disabled={isTerminalStatus || manualRefreshing}
               >
