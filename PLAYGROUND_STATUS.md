@@ -4,12 +4,12 @@
 
 ## 自动心跳（Auto)
 <<<<<<< HEAD
-- Auto ping: **2026-02-23 22:19 CST (UTC+8)**
+- Auto ping: **2026-02-23 22:45 CST (UTC+8)**
 =======
-- Auto ping: **2026-02-23 22:19 CST (UTC+8)**
+- Auto ping: **2026-02-23 22:45 CST (UTC+8)**
 >>>>>>> 91fd23f (chore(status): manual refresh board heartbeat)
-- Latest commit: **c07c3ee**
-- Message: **feat(agent-flow): add stage status mapping for async task**
+- Latest commit: **0d4cc5f**
+- Message: **feat: expose task trace metadata in async task UI**
 
 ## 当前阶段
 - **Phase 2 / 4：前后端任务追踪联动（进行中）**
