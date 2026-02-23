@@ -25,6 +25,7 @@ const AddChartAsync: React.FC = () => {
   const [lastPolledAt, setLastPolledAt] = useState<string>('');
   const [manualRefreshing, setManualRefreshing] = useState<boolean>(false);
   const [pollTimeoutReached, setPollTimeoutReached] = useState<boolean>(false);
+  const [lastSubmitValues, setLastSubmitValues] = useState<any>();
 
   const timerRef = useRef<NodeJS.Timeout>();
   const countdownTimerRef = useRef<NodeJS.Timeout>();
@@ -172,6 +173,7 @@ const AddChartAsync: React.FC = () => {
 
   const onFinish = async (values: any) => {
     if (submitting) return;
+    setLastSubmitValues(values);
     setSubmitting(true);
     setChartId(undefined);
     setStatus('idle');
@@ -203,6 +205,11 @@ const AddChartAsync: React.FC = () => {
       message.error('分析失败，' + buildFailureHint(e.message));
     }
     setSubmitting(false);
+  };
+
+  const onRetryLastSubmit = () => {
+    if (!lastSubmitValues || submitting) return;
+    form.submit();
   };
 
   return (
@@ -286,6 +293,13 @@ const AddChartAsync: React.FC = () => {
                   showIcon
                   type={pollError ? 'warning' : status === 'succeed' ? 'success' : 'info'}
                   message={hintText}
+                  action={
+                    status === 'failed' && lastSubmitValues ? (
+                      <Button type="primary" size="small" loading={submitting} onClick={onRetryLastSubmit}>
+                        一键重试上次参数
+                      </Button>
+                    ) : undefined
+                  }
                 />
               </Space>
             }
