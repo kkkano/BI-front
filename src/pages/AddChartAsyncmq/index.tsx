@@ -55,6 +55,19 @@ const AddChartAsync: React.FC = () => {
 
   const getStatusLabel = (status?: string) => getTaskStatusText(status);
 
+  const isTerminalStatus = chartDetail?.status === 'succeed' || chartDetail?.status === 'failed';
+
+  const hintText = useMemo(() => {
+    if (!chartId) return '提交任务后，系统会自动追踪分析进度';
+    if (pollTimeoutReached)
+      return '自动追踪已超时。你可以点击“重试自动追踪”继续获取结果，或前往“我的图表”稍后查看';
+    if (chartDetail?.status === 'wait') return '任务已入队，系统正在等待可用计算资源';
+    if (chartDetail?.status === 'running') return '任务执行中，可随时点击“立即刷新”获取最新进度';
+    if (chartDetail?.status === 'succeed') return '图表已生成完成，建议前往“我的图表”查看详情';
+    if (chartDetail?.status === 'failed') return buildFailureHint(chartDetail.execMessage);
+    return '系统正在处理中，请稍候';
+  }, [chartDetail?.execMessage, chartDetail?.status, chartId, pollTimeoutReached]);
+
   const progressPercent = useMemo(() => {
     const status = chartDetail?.status;
     if (status === 'succeed') return 100;
@@ -71,8 +84,6 @@ const AddChartAsync: React.FC = () => {
     if (chartDetail?.status === 'succeed') return 'success';
     return 'active';
   }, [chartDetail?.status]);
-
-  const isTerminalStatus = chartDetail?.status === 'succeed' || chartDetail?.status === 'failed';
 
   const nextRefreshInSec = useMemo(() => {
     if (!chartDetail || chartDetail.status === 'succeed' || chartDetail.status === 'failed') return 0;
@@ -224,7 +235,7 @@ const AddChartAsync: React.FC = () => {
 
   const renderResult = () => {
     if (!chartDetail) {
-      return <Alert type="info" showIcon message="提交任务后，这里会展示排队/执行状态和结果（120秒轮询）" />;
+      return <Alert type="info" showIcon message={hintText} />;
     }
 
     if (chartDetail.status === 'wait' || chartDetail.status === 'running') {
@@ -258,8 +269,9 @@ const AddChartAsync: React.FC = () => {
                     下次自动刷新：{manualRefreshing ? '同步中...' : `${countdown}s`}
                   </Tag>
                 ) : null}
-                <Tag color="processing">已轮询：{pollCountRef.current}/{MAX_RETRY}</Tag>
+                <Tag color="processing">已查询：{pollCountRef.current}/{MAX_RETRY}</Tag>
               </Space>
+              <Alert showIcon type={pollTimeoutReached ? 'warning' : 'info'} message={hintText} />
             </Space>
           }
         />
@@ -267,13 +279,7 @@ const AddChartAsync: React.FC = () => {
     }
 
     if (chartDetail.status === 'failed') {
-      return (
-        <Result
-          status="error"
-          title="分析失败"
-          subTitle={buildFailureHint(chartDetail.execMessage)}
-        />
-      );
+      return <Result status="error" title={statusText} subTitle={buildFailureHint(chartDetail.execMessage)} />;
     }
 
     let option: any = {};
