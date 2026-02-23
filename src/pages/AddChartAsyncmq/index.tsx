@@ -51,7 +51,7 @@ const AddChartAsync: React.FC = () => {
   const statusText = useMemo(() => {
     const status = chartDetail?.status;
     if (status === 'wait') return '排队中';
-    if (status === 'running') return '分析中';
+    if (status === 'running') return '分析执行中';
     if (status === 'succeed') return '分析完成';
     if (status === 'failed') return '分析失败';
     return '未开始';
@@ -59,7 +59,7 @@ const AddChartAsync: React.FC = () => {
 
   const getStatusLabel = (status?: string) => {
     if (status === 'wait') return '排队中';
-    if (status === 'running') return '分析中';
+    if (status === 'running') return '分析执行中';
     if (status === 'succeed') return '分析完成';
     if (status === 'failed') return '分析失败';
     return '状态更新';
@@ -241,7 +241,15 @@ const AddChartAsync: React.FC = () => {
     }
 
     if (chartDetail.status === 'failed') {
-      return <Result status="error" title="分析失败" subTitle={chartDetail.execMessage || '请更换数据后重试'} />;
+      return (
+        <Result
+          status="error"
+          title="分析失败"
+          subTitle={
+            chartDetail.execMessage || '任务执行失败，建议检查数据字段完整性、分析目标描述和图表类型后重试'
+          }
+        />
+      );
     }
 
     let option: any = {};

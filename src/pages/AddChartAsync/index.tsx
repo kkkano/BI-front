@@ -35,7 +35,7 @@ const AddChartAsync: React.FC = () => {
 
   const statusText = useMemo(() => {
     if (status === 'wait') return '排队中';
-    if (status === 'running') return '分析中';
+    if (status === 'running') return '分析执行中';
     if (status === 'succeed') return '分析完成';
     if (status === 'failed') return '分析失败';
     return '未开始';
@@ -57,7 +57,8 @@ const AddChartAsync: React.FC = () => {
     if (status === 'wait') return '任务已入队，系统正在等待可用计算资源';
     if (status === 'running') return '任务执行中，可随时点击“立即刷新”获取最新进度';
     if (status === 'succeed') return '图表已生成完成，建议前往“我的图表”查看详情';
-    if (status === 'failed') return execMessage || '任务执行失败，请检查数据格式或分析目标后重试';
+    if (status === 'failed')
+      return execMessage || '任务执行失败，建议检查数据字段完整性、分析目标描述和图表类型后重试';
     return '系统正在处理中，请稍候';
   }, [chartId, execMessage, pollError, status]);
 
