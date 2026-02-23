@@ -1,5 +1,6 @@
 import type { RequestOptions } from '@@/plugin-request/request';
 import type { RequestConfig } from '@umijs/max';
+import { history } from '@umijs/max';
 import { message, notification } from 'antd';
 
 // 错误处理方案： 错误类型
@@ -52,6 +53,30 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
 const getRuntimeError = (error: unknown): RequestRuntimeError =>
   isObject(error) ? (error as RequestRuntimeError) : {};
 
+const LOGIN_PATH = '/user/login';
+const AUTH_ERROR_CODES = new Set([40100, 40101]);
+
+const redirectToLogin = () => {
+  const { pathname, search = '' } = history.location;
+  if (pathname === LOGIN_PATH) {
+    return;
+  }
+  const redirect = `${pathname}${search}`;
+  history.push({
+    pathname: LOGIN_PATH,
+    search: redirect ? `?redirect=${encodeURIComponent(redirect)}` : undefined,
+  });
+};
+
+const handleAuthError = (errorCode?: number, errorMessage?: string) => {
+  if (!errorCode || !AUTH_ERROR_CODES.has(errorCode)) {
+    return false;
+  }
+  message.warning(errorMessage || '登录状态已失效，请重新登录');
+  redirectToLogin();
+  return true;
+};
+
 /**
  * @name 错误处理
  * pro 自带的错误处理， 可以在这里做自己的改动
@@ -76,6 +101,11 @@ export const errorConfig: RequestConfig = {
       const runtimeError = getRuntimeError(error);
       if (runtimeError.name === 'BizError' && runtimeError.info) {
         const { errorMessage, errorCode, showType } = runtimeError.info;
+
+        if (handleAuthError(errorCode, errorMessage)) {
+          return;
+        }
+
         switch (showType) {
           case ErrorShowType.SILENT:
             break;
@@ -92,7 +122,7 @@ export const errorConfig: RequestConfig = {
             });
             break;
           case ErrorShowType.REDIRECT:
-            // TODO: redirect
+            redirectToLogin();
             break;
           default:
             message.error(errorMessage || 'Request error');
@@ -126,14 +156,6 @@ export const errorConfig: RequestConfig = {
 
   // 响应拦截器
   responseInterceptors: [
-    (response) => {
-      // 拦截响应数据，进行个性化处理
-      const responseData = (response as { data?: ResponseStructure }).data;
-
-      if (responseData?.success === false) {
-        message.error(responseData.errorMessage || '请求失败！');
-      }
-      return response;
-    },
+    (response) => response,
   ],
 };
