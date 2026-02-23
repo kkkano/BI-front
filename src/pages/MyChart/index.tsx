@@ -31,6 +31,12 @@ const STATUS_CONFIG: Record<string, { color: string; label: string }> = {
 
 const POLLING_INTERVAL = 5000;
 
+const PREVIEW_HINT_TEXT: Record<string, string> = {
+  wait: '图表排队中，状态更新后可预览',
+  running: '图表生成中，完成后可点击预览',
+  failed: '图表生成失败，请修复后重新生成',
+};
+
 const statusToResultStatus = (status?: string): 'warning' | 'info' | 'success' | 'error' => {
   if (status === 'wait') {
     return 'warning';
@@ -82,6 +88,7 @@ const MyChartPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [deletingId, setDeletingId] = useState<number | undefined>();
   const [previewChart, setPreviewChart] = useState<{ title: string; option: object } | null>(null);
+  const [previewLoadingId, setPreviewLoadingId] = useState<number | undefined>();
   const pollingRequestingRef = useRef(false);
 
   const hasPendingCharts = useMemo(
@@ -152,6 +159,17 @@ const MyChartPage: React.FC = () => {
     setDeletingId(undefined);
   };
 
+  const openChartPreview = (item: API.Chart, parsedChartOption: object) => {
+    setPreviewLoadingId(item.id);
+    window.setTimeout(() => {
+      setPreviewChart({
+        title: item.name || '未命名图表',
+        option: parsedChartOption,
+      });
+      setPreviewLoadingId(undefined);
+    }, 80);
+  };
+
   const renderChartPreview = (item: API.Chart, parsedChartOption?: object) => {
     if (!parsedChartOption) {
       return (
@@ -168,19 +186,11 @@ const MyChartPage: React.FC = () => {
         role="button"
         tabIndex={0}
         style={{ cursor: 'zoom-in' }}
-        onClick={() =>
-          setPreviewChart({
-            title: item.name || '未命名图表',
-            option: parsedChartOption,
-          })
-        }
+        onClick={() => openChartPreview(item, parsedChartOption)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
-            setPreviewChart({
-              title: item.name || '未命名图表',
-              option: parsedChartOption,
-            });
+            openChartPreview(item, parsedChartOption);
           }
         }}
       >
@@ -276,6 +286,17 @@ const MyChartPage: React.FC = () => {
                         minute: '2-digit',
                       })}
                     </Text>
+                    {item.status === 'succeed' && parsedChartOption && (
+                      <Button
+                        type="link"
+                        size="small"
+                        onClick={() => openChartPreview(item, parsedChartOption)}
+                        loading={previewLoadingId === item.id}
+                        style={{ padding: 0 }}
+                      >
+                        预览
+                      </Button>
+                    )}
                     <Popconfirm
                       title="确定要删除这张图表吗？"
                       okText="删除"
@@ -308,17 +329,22 @@ const MyChartPage: React.FC = () => {
                 )}
 
                 {(item.status === 'wait' || item.status === 'running') && (
-                  <Result
-                    status={statusToResultStatus(item.status)}
-                    title={item.status === 'wait' ? '待生成' : '图表生成中'}
-                    subTitle={
-                      item.execMessage ??
-                      (item.status === 'wait'
-                        ? '当前图表生成队列繁忙，请耐心等候'
-                        : '正在分析数据，请稍候...')
-                    }
-                    style={{ padding: '16px 0' }}
-                  />
+                  <>
+                    <Result
+                      status={statusToResultStatus(item.status)}
+                      title={item.status === 'wait' ? '待生成' : '图表生成中'}
+                      subTitle={
+                        item.execMessage ??
+                        (item.status === 'wait'
+                          ? '当前图表生成队列繁忙，请耐心等候'
+                          : '正在分析数据，请稍候...')
+                      }
+                      style={{ padding: '16px 0 8px' }}
+                    />
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      {PREVIEW_HINT_TEXT[item.status ?? '']}
+                    </Text>
+                  </>
                 )}
                 {item.status === 'succeed' && (
                   <>
@@ -343,11 +369,14 @@ const MyChartPage: React.FC = () => {
                       subTitle="请根据失败原因调整后重试"
                       style={{ padding: '16px 0 8px' }}
                     />
-                    <Card type="inner" size="small" title="失败原因">
+                    <Card type="inner" size="small" title="失败原因" style={{ marginBottom: 8 }}>
                       <Text type="danger" style={{ whiteSpace: 'pre-wrap' }}>
                         {item.execMessage ?? '暂无详细错误信息，请稍后重试'}
                       </Text>
                     </Card>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      {PREVIEW_HINT_TEXT.failed}
+                    </Text>
                   </>
                 )}
               </Card>
