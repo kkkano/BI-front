@@ -57,6 +57,14 @@ const AddChartAsync: React.FC = () => {
     return '未开始';
   }, [chartDetail?.status]);
 
+  const getStatusLabel = (status?: string) => {
+    if (status === 'wait') return '排队中';
+    if (status === 'running') return '分析中';
+    if (status === 'succeed') return '分析完成';
+    if (status === 'failed') return '分析失败';
+    return '状态更新';
+  };
+
   const progressPercent = useMemo(() => {
     const status = chartDetail?.status;
     if (status === 'succeed') return 100;
@@ -122,21 +130,21 @@ const AddChartAsync: React.FC = () => {
         setChartDetail(res.data);
 
         if (res.data.status) {
-          addEvent(res.data.status, res.data.execMessage || statusText || '状态更新');
+          addEvent(res.data.status, res.data.execMessage || getStatusLabel(res.data.status));
         }
 
         if (res.data.status === 'succeed' || res.data.status === 'failed') {
           stopPolling();
           if (res.data.status === 'succeed') {
-            message.success('图表生成完成啦，主人可以直接查看结果 ✨');
+            message.success('图表分析完成，可前往“我的图表”查看');
           }
           return;
         }
 
         if (pollCountRef.current >= MAX_RETRY) {
           stopPolling();
-          addEvent('timeout', '轮询次数耗尽，建议稍后手动刷新');
-          message.warning('已轮询 10 次（每次 120 秒）仍未完成，稍后可在「我的图表」继续查看');
+          addEvent('timeout', '自动追踪次数已达上限，请稍后在“我的图表”查看结果');
+          message.warning('自动追踪次数已达上限，请稍后在“我的图表”查看结果');
         }
       }
     } catch (e: any) {
@@ -144,10 +152,10 @@ const AddChartAsync: React.FC = () => {
 
       if (errorCountRef.current >= MAX_RETRY) {
         stopPolling();
-        addEvent('error', '状态查询连续失败 10 次，自动追踪已停止');
-        message.error('状态查询连续失败 10 次，已停止自动追踪，请稍后手动查看');
+        addEvent('error', '状态查询连续失败次数过多，已暂停自动追踪，请稍后手动刷新');
+        message.error('状态查询连续失败次数过多，已暂停自动追踪，请稍后手动刷新');
       } else {
-        message.warning(`状态查询失败，准备第 ${errorCountRef.current + 1} 次重试`);
+        message.warning(`状态查询失败（连续 ${errorCountRef.current}/${MAX_RETRY} 次）`);
       }
     }
   };
@@ -193,11 +201,11 @@ const AddChartAsync: React.FC = () => {
       const id = res.data.chartId;
       setChartId(id);
       addEvent('submitted', `任务 #${id} 已提交`);
-      message.success(`任务已提交（#${id}），开始追踪：每 120 秒查询一次，最多 10 次`);
+      message.success(`分析任务提交成功（#${id}），正在自动追踪状态`);
       form.resetFields();
       startPolling(id);
     } catch (e: any) {
-      message.error('分析失败,' + e.message);
+      message.error('分析失败，' + e.message);
     } finally {
       setSubmitting(false);
     }
