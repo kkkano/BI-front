@@ -175,6 +175,27 @@ const MyChartPage: React.FC = () => {
     return chartList.filter((chart) => chart.status === statusFilter);
   }, [chartList, statusFilter]);
 
+  const listEmptyText = useMemo(() => {
+    if (statusFilter !== 'all' && chartList.length > 0) {
+      const activeStatusLabel =
+        STATUS_FILTER_OPTIONS.find((option) => option.value === statusFilter)?.label || '当前状态';
+      return (
+        <Space direction="vertical" size={8} align="center">
+          <Text type="secondary">当前页没有{activeStatusLabel}图表</Text>
+          <Button size="small" onClick={() => setStatusFilter('all')}>
+            查看全部状态
+          </Button>
+        </Space>
+      );
+    }
+
+    if (searchParams.name) {
+      return '未找到匹配图表，试试其他关键词';
+    }
+
+    return '暂无图表，快去生成一个吧！';
+  }, [chartList.length, searchParams.name, statusFilter]);
+
   useEffect(() => {
     chartListRef.current = chartList;
   }, [chartList]);
@@ -357,6 +378,12 @@ const MyChartPage: React.FC = () => {
                   name: value || undefined,
                 })
               }
+              onChange={(event) => {
+                if (event.target.value) {
+                  return;
+                }
+                setSearchParams({ ...initSearchParams, name: undefined });
+              }}
             />
           </Col>
           <Col span={24}>
@@ -393,7 +420,7 @@ const MyChartPage: React.FC = () => {
         }}
         loading={loading}
         dataSource={visibleChartList}
-        locale={{ emptyText: '暂无图表，快去生成一个吧！' }}
+        locale={{ emptyText: listEmptyText }}
         renderItem={(item) => {
           const statusCfg = STATUS_CONFIG[item.status ?? ''];
           const parsedChartOption =
