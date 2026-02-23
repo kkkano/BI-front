@@ -12,6 +12,7 @@ import {
   Popconfirm,
   Result,
   Row,
+  Segmented,
   Space,
   Tag,
   Tooltip,
@@ -44,6 +45,14 @@ const STATUS_TOOLTIP_TEXT: Record<string, string> = {
   succeed: '图表与分析结论已生成完成',
   failed: '生成异常，建议查看失败原因后修复重试',
 };
+
+const STATUS_FILTER_OPTIONS = [
+  { label: '全部', value: 'all' },
+  { label: '待生成', value: 'wait' },
+  { label: '生成中', value: 'running' },
+  { label: '已完成', value: 'succeed' },
+  { label: '失败', value: 'failed' },
+] as const;
 
 const statusToResultStatus = (status?: string): 'warning' | 'info' | 'success' | 'error' => {
   if (status === 'wait') {
@@ -104,12 +113,22 @@ const MyChartPage: React.FC = () => {
   const [deletingId, setDeletingId] = useState<number | undefined>();
   const [previewChart, setPreviewChart] = useState<{ title: string; option: object } | null>(null);
   const [previewLoadingId, setPreviewLoadingId] = useState<number | undefined>();
+  const [statusFilter, setStatusFilter] = useState<'all' | 'wait' | 'running' | 'succeed' | 'failed'>(
+    'all',
+  );
   const pollingRequestingRef = useRef(false);
 
   const hasPendingCharts = useMemo(
     () => chartList.some((chart) => chart.status === 'wait' || chart.status === 'running'),
     [chartList],
   );
+
+  const visibleChartList = useMemo(() => {
+    if (statusFilter === 'all') {
+      return chartList;
+    }
+    return chartList.filter((chart) => chart.status === statusFilter);
+  }, [chartList, statusFilter]);
 
   const loadData = useCallback(
     async (silent = false) => {
@@ -242,6 +261,23 @@ const MyChartPage: React.FC = () => {
               }
             />
           </Col>
+          <Col span={24}>
+            <Segmented
+              size="small"
+              value={statusFilter}
+              options={STATUS_FILTER_OPTIONS.map((option) => {
+                const count =
+                  option.value === 'all'
+                    ? chartList.length
+                    : chartList.filter((chart) => chart.status === option.value).length;
+                return {
+                  label: `${option.label} (${count})`,
+                  value: option.value,
+                };
+              })}
+              onChange={(value) => setStatusFilter(value as 'all' | 'wait' | 'running' | 'succeed' | 'failed')}
+            />
+          </Col>
         </Row>
       </Card>
       <List
@@ -255,7 +291,7 @@ const MyChartPage: React.FC = () => {
           showSizeChanger: false,
         }}
         loading={loading}
-        dataSource={chartList}
+        dataSource={visibleChartList}
         locale={{ emptyText: '暂无图表，快去生成一个吧！' }}
         renderItem={(item) => {
           const statusCfg = STATUS_CONFIG[item.status ?? ''];
