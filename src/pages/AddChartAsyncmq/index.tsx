@@ -57,6 +57,7 @@ type AddChartFormValues = {
 
 const EVENT_TAG_COLOR: Record<string, string> = {
   submitted: 'blue',
+  retry: 'cyan',
   wait: 'default',
   running: 'processing',
   succeed: 'success',
@@ -69,6 +70,7 @@ const EVENT_TAG_COLOR: Record<string, string> = {
 
 const EVENT_TAG_LABEL: Record<string, string> = {
   submitted: '已提交',
+  retry: '恢复追踪',
   wait: '排队中',
   running: '执行中',
   succeed: '已完成',
@@ -122,9 +124,30 @@ const parseChartOption = (genChart?: string): EChartsOption | null => {
 const hasUsableOption = (option: EChartsOption | null): option is EChartsOption =>
   !!option && Object.keys(option as Record<string, unknown>).length > 0;
 
+const getReadableEventText = (status?: string, execMessage?: string): string => {
+  if (status === 'failed') {
+    return buildFailureHint(execMessage);
+  }
+  if (status === 'succeed') {
+    return execMessage || '图表分析完成，可查看结论与可视化结果';
+  }
+  if (status === 'running') {
+    return execMessage || '任务执行中，正在生成图表和分析结论';
+  }
+  if (status === 'wait') {
+    return execMessage || '任务排队中，等待可用计算资源';
+  }
+  return execMessage || getTaskStatusText(status);
+};
+
+const getReadableError = (error: unknown): string => {
+  const rawMessage = getErrorMessage(error);
+  return getFailureReasonSummary(rawMessage) || rawMessage;
+};
+
 /**
  * 添加图表(异步 MQ)页面 + Agent式进度追踪
- * 轮询策略：120秒一次，最多10次；连续失败达到10次才判定追踪失败
+ * 轮询策略：30秒一次，最多30次；连续失败达到10次才判定追踪失败
  */
 const AddChartAsync: React.FC = () => {
   const [form] = useForm();
@@ -145,12 +168,11 @@ const AddChartAsync: React.FC = () => {
   const pollCountRef = useRef<number>(0);
   const errorCountRef = useRef<number>(0);
 
-  const POLL_INTERVAL_MS = 120 * 1000;
-  const MAX_RETRY = 10;
+  const POLL_INTERVAL_MS = 30 * 1000;
+  const MAX_RETRY = 30;
+  const MAX_CONSECUTIVE_ERRORS = 10;
 
   const statusText = useMemo(() => getTaskStatusText(chartDetail?.status), [chartDetail?.status]);
-
-  const getStatusLabel = (status?: string) => getTaskStatusText(status);
 
   const isTerminalStatus = isTerminalTaskStatus(chartDetail?.status);
 
@@ -262,7 +284,7 @@ const AddChartAsync: React.FC = () => {
       setPollError('');
 
       if (res.data.status) {
-        addEvent(res.data.status, res.data.execMessage || getStatusLabel(res.data.status));
+        addEvent(res.data.status, getReadableEventText(res.data.status, res.data.execMessage));
       }
 
       if (isTerminalTaskStatus(res.data.status)) {
@@ -278,13 +300,13 @@ const AddChartAsync: React.FC = () => {
       setLastPolledAt(new Date().toLocaleTimeString('zh-CN', { hour12: false }));
 
       const errorMessage =
-        errorCountRef.current >= MAX_RETRY
+        errorCountRef.current >= MAX_CONSECUTIVE_ERRORS
           ? '状态查询连续失败次数过多，已暂停自动追踪，请稍后手动刷新'
-          : `状态查询失败（连续 ${errorCountRef.current}/${MAX_RETRY} 次）：${getErrorMessage(error)}`;
+          : `状态查询失败（连续 ${errorCountRef.current}/${MAX_CONSECUTIVE_ERRORS} 次）：${getReadableError(error)}`;
 
       setPollError(errorMessage);
 
-      if (errorCountRef.current >= MAX_RETRY) {
+      if (errorCountRef.current >= MAX_CONSECUTIVE_ERRORS) {
         stopPolling();
         addEvent('error', errorMessage);
         message.error(errorMessage);
@@ -321,6 +343,7 @@ const AddChartAsync: React.FC = () => {
   const onRetryAutoPolling = () => {
     if (!chartId || isTerminalStatus || manualRefreshing) return;
     setPollError('');
+    addEvent('retry', '已恢复自动追踪，系统将每 30 秒自动刷新状态');
     startPolling(chartId);
     message.success('已恢复自动追踪，请稍候查看最新状态');
   };
@@ -357,7 +380,7 @@ const AddChartAsync: React.FC = () => {
 
       const id = res.data.chartId;
       setChartId(id);
-      addEvent('submitted', `任务 #${id} 已提交`);
+      addEvent('submitted', `任务 #${id} 已提交，系统已开启自动追踪（每 30 秒刷新）`);
       message.success(`分析任务提交成功（#${id}），正在自动追踪状态`);
       form.resetFields();
       startPolling(id);
@@ -470,7 +493,9 @@ const AddChartAsync: React.FC = () => {
     title: (
       <Space>
         <Tag color={EVENT_TAG_COLOR[event.status] || 'default'}>{EVENT_TAG_LABEL[event.status] || event.status}</Tag>
-        <span>{event.text}</span>
+        <Typography.Text ellipsis={{ tooltip: event.text }} style={{ maxWidth: 520 }}>
+          {event.text}
+        </Typography.Text>
       </Space>
     ),
     description: event.at,
