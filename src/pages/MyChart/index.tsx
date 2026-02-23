@@ -41,6 +41,7 @@ const STATUS_CONFIG: Record<string, { color: string; label: string; shortLabel: 
 };
 
 const POLLING_INTERVAL = 5000;
+const POLLING_INTERVAL_SECONDS = POLLING_INTERVAL / 1000;
 
 const PREVIEW_HINT_TEXT: Record<string, string> = {
   wait: '图表排队中，状态更新后可预览',
@@ -148,6 +149,9 @@ const MyChartPage: React.FC = () => {
   const [total, setTotal] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
   const [deletingId, setDeletingId] = useState<number | undefined>();
+  const [refreshingPending, setRefreshingPending] = useState<boolean>(false);
+  const [refreshCountdown, setRefreshCountdown] = useState<number>(POLLING_INTERVAL_SECONDS);
+  const [lastRefreshTime, setLastRefreshTime] = useState<string>();
   const [previewChart, setPreviewChart] = useState<{ title: string; option: EChartsOption } | null>(
     null,
   );
@@ -214,10 +218,18 @@ const MyChartPage: React.FC = () => {
     }
 
     pollingRequestingRef.current = true;
+    setRefreshingPending(true);
     try {
       const res = await getChartTaskStatusBatchUsingPOST({ chartIds: pendingChartIds });
       const taskStatusList = res?.data ?? [];
       if (!taskStatusList.length) {
+        setLastRefreshTime(
+          new Date().toLocaleTimeString('zh-CN', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+          }),
+        );
         return;
       }
 
@@ -228,6 +240,13 @@ const MyChartPage: React.FC = () => {
         }
       });
       if (taskStatusMap.size === 0) {
+        setLastRefreshTime(
+          new Date().toLocaleTimeString('zh-CN', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+          }),
+        );
         return;
       }
 
@@ -243,10 +262,18 @@ const MyChartPage: React.FC = () => {
           return mergeChartTaskStatus(chart, taskStatus);
         }),
       );
+      setLastRefreshTime(
+        new Date().toLocaleTimeString('zh-CN', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        }),
+      );
     } catch (_error: unknown) {
       return;
     } finally {
       pollingRequestingRef.current = false;
+      setRefreshingPending(false);
     }
   }, []);
 
@@ -273,12 +300,27 @@ const MyChartPage: React.FC = () => {
 
   useEffect(() => {
     if (!hasPendingCharts) {
+      setRefreshCountdown(POLLING_INTERVAL_SECONDS);
+      setLastRefreshTime(undefined);
       return;
     }
-    const timer = window.setInterval(() => {
-      refreshPendingChartStatus();
+
+    setRefreshCountdown(POLLING_INTERVAL_SECONDS);
+    void refreshPendingChartStatus();
+
+    const countdownTimer = window.setInterval(() => {
+      setRefreshCountdown((prev) => (prev <= 1 ? POLLING_INTERVAL_SECONDS : prev - 1));
+    }, 1000);
+
+    const pollingTimer = window.setInterval(() => {
+      void refreshPendingChartStatus();
+      setRefreshCountdown(POLLING_INTERVAL_SECONDS);
     }, POLLING_INTERVAL);
-    return () => window.clearInterval(timer);
+
+    return () => {
+      window.clearInterval(countdownTimer);
+      window.clearInterval(pollingTimer);
+    };
   }, [hasPendingCharts, refreshPendingChartStatus]);
 
   const handleDeleteChart = async (id: number) => {
@@ -288,8 +330,19 @@ const MyChartPage: React.FC = () => {
       if (result.data === false) {
         message.error('删除失败，请稍后重试');
       } else {
-        message.success('图表已删除');
-        loadData();
+        const currentPage = searchParams.current ?? 1;
+        const shouldBackPreviousPage = currentPage > 1 && chartList.length === 1;
+
+        if (shouldBackPreviousPage) {
+          setSearchParams((prev) => ({
+            ...prev,
+            current: Math.max((prev.current ?? 1) - 1, 1),
+          }));
+          message.success('图表已删除，已返回上一页');
+        } else {
+          message.success('图表已删除');
+          loadData();
+        }
       }
     } catch (error: unknown) {
       message.error('删除失败，' + getErrorMessage(error));
@@ -386,6 +439,32 @@ const MyChartPage: React.FC = () => {
               }}
             />
           </Col>
+          {hasPendingCharts && (
+            <Col span={24}>
+              <Space size={8} wrap>
+                <Tag color={refreshingPending ? 'processing' : 'blue'}>
+                  自动刷新：{refreshingPending ? '同步中...' : `${refreshCountdown}s 后更新`}
+                </Tag>
+                {lastRefreshTime && (
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    最近同步：{lastRefreshTime}
+                  </Text>
+                )}
+                <Button
+                  type="link"
+                  size="small"
+                  loading={refreshingPending}
+                  onClick={() => {
+                    setRefreshCountdown(POLLING_INTERVAL_SECONDS);
+                    void refreshPendingChartStatus();
+                  }}
+                  style={{ padding: 0 }}
+                >
+                  立即同步状态
+                </Button>
+              </Space>
+            </Col>
+          )}
           <Col span={24}>
             <Segmented
               size="small"
