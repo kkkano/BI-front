@@ -119,6 +119,7 @@ const AddChartAsync: React.FC = () => {
   const [lastPolledAt, setLastPolledAt] = useState<string>('');
   const [manualRefreshing, setManualRefreshing] = useState<boolean>(false);
   const [pollTimeoutReached, setPollTimeoutReached] = useState<boolean>(false);
+  const [pollPausedByError, setPollPausedByError] = useState<boolean>(false);
   const [lastSubmitValues, setLastSubmitValues] = useState<AddChartFormValues>();
 
   const timerRef = useRef<ReturnType<typeof setInterval>>();
@@ -146,13 +147,15 @@ const AddChartAsync: React.FC = () => {
     if (!chartId) return '提交任务后，系统会自动追踪分析进度';
     if (pollTimeoutReached)
       return '自动追踪已超时。你可以点击“重试自动追踪”继续获取结果，或前往“我的图表”稍后查看';
+    if (pollPausedByError)
+      return '自动追踪已暂停：状态查询连续失败。建议先手动刷新一次，确认网络稳定后再恢复自动追踪';
     if (pollError) return pollError;
     if (status === 'wait') return '任务已入队，系统正在等待可用计算资源';
     if (status === 'running') return '任务执行中，可随时点击“立即刷新”获取最新进度';
     if (status === 'succeed') return '图表已生成完成，建议前往“我的图表”查看详情';
     if (status === 'failed') return buildFailureHint(execMessage);
     return '系统正在处理中，请稍候';
-  }, [chartId, execMessage, pollError, pollTimeoutReached, status]);
+  }, [chartId, execMessage, pollError, pollPausedByError, pollTimeoutReached, status]);
 
   const beforeUpload: UploadProps['beforeUpload'] = (file) => {
     if (!/\.(xlsx|xls|csv)$/i.test(file.name)) {
@@ -202,6 +205,7 @@ const AddChartAsync: React.FC = () => {
     setLastPolledAt('');
     setPollError('');
     setPollTimeoutReached(false);
+    setPollPausedByError(false);
   };
 
   const resetCountdown = () => {
@@ -218,6 +222,7 @@ const AddChartAsync: React.FC = () => {
         '自动追踪超时：已达到最大查询次数。你可以重试自动追踪，或稍后在“我的图表”查看最终结果';
       stopPolling();
       setPollTimeoutReached(true);
+      setPollPausedByError(false);
       setPollError(timeoutMessage);
       addEvent('timeout', timeoutMessage);
       return;
@@ -250,6 +255,7 @@ const AddChartAsync: React.FC = () => {
       setChartDetail(data);
       setStatus(nextStatus);
       setExecMessage(nextExecMessage);
+      setPollPausedByError(false);
       setPollError('');
 
       if (data.status) {
@@ -284,6 +290,7 @@ const AddChartAsync: React.FC = () => {
 
       if (consecutiveErrorRef.current >= MAX_CONSECUTIVE_ERRORS) {
         stopPolling();
+        setPollPausedByError(true);
         addEvent('error', errorMessage);
         message.error(errorMessage);
       } else {
@@ -315,10 +322,17 @@ const AddChartAsync: React.FC = () => {
 
   const onRetryAutoPolling = () => {
     if (!chartId || isTerminalStatus || manualRefreshing) return;
+    if (!pollTimeoutReached && !pollPausedByError) return;
+
     setPollError('');
-    addEvent('retry', '已手动恢复自动追踪');
+    setPollPausedByError(false);
+
+    const retryText = pollTimeoutReached
+      ? '已重试自动追踪，请稍候查看最新状态'
+      : '已恢复自动追踪，请稍候查看最新状态';
+    addEvent('retry', retryText);
     startPolling(chartId);
-    message.success('已恢复自动追踪，请稍候查看最新状态');
+    message.success(retryText);
   };
 
   const onFinish = async (values: AddChartFormValues) => {
@@ -466,13 +480,13 @@ const AddChartAsync: React.FC = () => {
               >
                 立即刷新
               </Button>
-              {pollTimeoutReached ? (
+              {pollTimeoutReached || pollPausedByError ? (
                 <Button
                   type="primary"
                   onClick={onRetryAutoPolling}
                   disabled={isTerminalStatus || manualRefreshing}
                 >
-                  重试自动追踪
+                  {pollTimeoutReached ? '重试自动追踪' : '恢复自动追踪'}
                 </Button>
               ) : null}
               {!isTerminalStatus ? (

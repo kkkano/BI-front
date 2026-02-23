@@ -9,6 +9,7 @@ type TaskProgressPanelProps = {
   manualRefreshing: boolean;
   isTerminalStatus: boolean;
   pollTimeoutReached: boolean;
+  pollPausedByError: boolean;
   pollCount: number;
   maxRetry: number;
   hintText: string;
@@ -26,6 +27,7 @@ const TaskProgressPanel: React.FC<TaskProgressPanelProps> = ({
   manualRefreshing,
   isTerminalStatus,
   pollTimeoutReached,
+  pollPausedByError,
   pollCount,
   maxRetry,
   hintText,
@@ -34,11 +36,16 @@ const TaskProgressPanel: React.FC<TaskProgressPanelProps> = ({
   onManualRefresh,
   onRetryAutoPolling,
 }) => {
+  const shouldShowRetry = pollTimeoutReached || pollPausedByError;
+  const retryButtonText = pollTimeoutReached ? '重试自动追踪' : '恢复自动追踪';
+
   const actionHint = pollTimeoutReached
     ? '自动追踪已暂停，点击“重试自动追踪”可恢复每 30 秒自动刷新。'
-    : pollError
-      ? '可先点击“立即刷新”确认最新状态，再决定是否继续等待。'
-      : '系统会继续自动刷新，你也可以随时手动刷新查看最新进度。';
+    : pollPausedByError
+      ? '自动追踪已因连续查询失败而暂停，点击“恢复自动追踪”后系统会继续自动刷新。'
+      : pollError
+        ? '可先点击“立即刷新”确认最新状态，再决定是否继续等待。'
+        : '系统会继续自动刷新，你也可以随时手动刷新查看最新进度。';
 
   return (
     <Result
@@ -60,13 +67,13 @@ const TaskProgressPanel: React.FC<TaskProgressPanelProps> = ({
             >
               立即刷新
             </Button>
-            {pollTimeoutReached ? (
+            {shouldShowRetry ? (
               <Button
                 type="primary"
                 onClick={onRetryAutoPolling}
                 disabled={isTerminalStatus || manualRefreshing}
               >
-                重试自动追踪
+                {retryButtonText}
               </Button>
             ) : null}
             {!isTerminalStatus ? (
