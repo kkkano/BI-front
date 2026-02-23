@@ -28,10 +28,10 @@ const { Text } = Typography;
 const FAILURE_REASON_COLLAPSE_KEY = 'failure-reason';
 
 const STATUS_CONFIG: Record<string, { color: string; label: string; shortLabel: string }> = {
-  wait: { color: 'warning', label: '待生成', shortLabel: '待' },
-  running: { color: 'processing', label: '生成中', shortLabel: '中' },
-  succeed: { color: 'success', label: '已完成', shortLabel: '成' },
-  failed: { color: 'error', label: '生成失败', shortLabel: '败' },
+  wait: { color: 'warning', label: '排队中', shortLabel: '排队中' },
+  running: { color: 'processing', label: '分析执行中', shortLabel: '执行中' },
+  succeed: { color: 'success', label: '分析完成', shortLabel: '完成' },
+  failed: { color: 'error', label: '分析失败', shortLabel: '失败' },
 };
 
 const POLLING_INTERVAL = 5000;
@@ -51,10 +51,10 @@ const STATUS_TOOLTIP_TEXT: Record<string, string> = {
 
 const STATUS_FILTER_OPTIONS = [
   { label: '全部', value: 'all' },
-  { label: '待生成', value: 'wait' },
-  { label: '生成中', value: 'running' },
-  { label: '已完成', value: 'succeed' },
-  { label: '失败', value: 'failed' },
+  { label: STATUS_CONFIG.wait.label, value: 'wait' },
+  { label: STATUS_CONFIG.running.label, value: 'running' },
+  { label: STATUS_CONFIG.succeed.label, value: 'succeed' },
+  { label: STATUS_CONFIG.failed.label, value: 'failed' },
 ] as const;
 
 const statusToResultStatus = (status?: string): 'warning' | 'info' | 'success' | 'error' => {
@@ -352,10 +352,10 @@ const MyChartPage: React.FC = () => {
                         <Tooltip title={STATUS_TOOLTIP_TEXT[item.status ?? '']}>
                           <Tag
                             color={statusCfg.color}
-                            style={{ marginRight: 0, maxWidth: 88 }}
+                            style={{ marginRight: 0, maxWidth: '100%' }}
                           >
                             <Text
-                              style={{ color: 'inherit', maxWidth: 56 }}
+                              style={{ color: 'inherit', maxWidth: '100%' }}
                               ellipsis={{ tooltip: statusCfg.label }}
                             >
                               {statusCfg.label}
@@ -422,7 +422,7 @@ const MyChartPage: React.FC = () => {
                   <>
                     <Result
                       status={statusToResultStatus(item.status)}
-                      title={item.status === 'wait' ? '待生成' : '图表生成中'}
+                      title={item.status === 'wait' ? STATUS_CONFIG.wait.label : STATUS_CONFIG.running.label}
                       subTitle={
                         item.execMessage ??
                         (item.status === 'wait'
