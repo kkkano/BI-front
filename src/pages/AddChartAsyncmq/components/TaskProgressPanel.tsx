@@ -1,4 +1,4 @@
-import { Alert, Button, Progress, Result, Space, Tag } from 'antd';
+import { Alert, Button, Progress, Result, Space, Tag, Typography } from 'antd';
 import React from 'react';
 
 type TaskProgressPanelProps = {
@@ -14,6 +14,9 @@ type TaskProgressPanelProps = {
   maxRetry: number;
   hintText: string;
   pollError?: string;
+  pollErrorDetail?: string;
+  consecutiveErrorCount: number;
+  maxConsecutiveErrors: number;
   lastPolledAt?: string;
   onManualRefresh: () => void;
   onRetryAutoPolling: () => void;
@@ -32,6 +35,9 @@ const TaskProgressPanel: React.FC<TaskProgressPanelProps> = ({
   maxRetry,
   hintText,
   pollError,
+  pollErrorDetail,
+  consecutiveErrorCount,
+  maxConsecutiveErrors,
   lastPolledAt,
   onManualRefresh,
   onRetryAutoPolling,
@@ -84,13 +90,32 @@ const TaskProgressPanel: React.FC<TaskProgressPanelProps> = ({
             <Tag color="processing">
               已查询：{pollCount}/{maxRetry}
             </Tag>
+            {pollError && consecutiveErrorCount > 0 ? (
+              <Tag color={pollPausedByError ? 'error' : 'warning'}>
+                连续失败：{consecutiveErrorCount}/{maxConsecutiveErrors}
+              </Tag>
+            ) : null}
             {lastPolledAt ? <Tag>最近查询：{lastPolledAt}</Tag> : null}
           </Space>
           <Alert
             showIcon
             type={pollError || pollTimeoutReached ? 'warning' : 'info'}
             message={pollError || hintText}
-            description={actionHint}
+            description={
+              <Space direction="vertical" size={2} style={{ width: '100%' }}>
+                <span>{actionHint}</span>
+                {pollErrorDetail ? (
+                  <Typography.Paragraph
+                    type="secondary"
+                    copyable
+                    ellipsis={{ rows: 2, expandable: true, symbol: '展开异常详情' }}
+                    style={{ marginBottom: 0 }}
+                  >
+                    {pollErrorDetail}
+                  </Typography.Paragraph>
+                ) : null}
+              </Space>
+            }
           />
         </Space>
       }

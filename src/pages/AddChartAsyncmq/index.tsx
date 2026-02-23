@@ -110,6 +110,41 @@ const getReadableError = (error: unknown): string => {
   return getFailureReasonSummary(rawMessage) || rawMessage;
 };
 
+const getPollErrorHint = (messageText: string): string => {
+  const normalized = messageText.toLowerCase();
+
+  if (
+    normalized.includes('network') ||
+    normalized.includes('fetch') ||
+    normalized.includes('timeout') ||
+    normalized.includes('timed out') ||
+    normalized.includes('econn')
+  ) {
+    return '网络连接异常，建议检查网络后重试';
+  }
+
+  if (
+    normalized.includes('401') ||
+    normalized.includes('403') ||
+    normalized.includes('unauthorized') ||
+    normalized.includes('forbidden')
+  ) {
+    return '登录状态可能已失效，请重新登录后再试';
+  }
+
+  if (
+    normalized.includes('500') ||
+    normalized.includes('502') ||
+    normalized.includes('503') ||
+    normalized.includes('504') ||
+    normalized.includes('server')
+  ) {
+    return '服务端暂时不可用，建议稍后重试';
+  }
+
+  return '状态查询异常，请先手动刷新确认任务状态';
+};
+
 /**
  * 添加图表(异步 MQ)页面 + Agent式进度追踪
  * 轮询策略：30秒一次，最多30次；连续失败达到10次才判定追踪失败
@@ -127,6 +162,8 @@ const AddChartAsync: React.FC = () => {
   const [pollCount, setPollCount] = useState<number>(0);
   const [lastPolledAt, setLastPolledAt] = useState<string>('');
   const [pollError, setPollError] = useState<string>('');
+  const [pollErrorDetail, setPollErrorDetail] = useState<string>('');
+  const [consecutiveErrorCount, setConsecutiveErrorCount] = useState<number>(0);
   const [lastSubmitValues, setLastSubmitValues] = useState<AddChartFormValues>();
 
   const timerRef = useRef<ReturnType<typeof setInterval>>();
@@ -211,8 +248,10 @@ const AddChartAsync: React.FC = () => {
     pollCountRef.current = 0;
     errorCountRef.current = 0;
     setPollCount(0);
+    setConsecutiveErrorCount(0);
     setLastPolledAt('');
     setPollError('');
+    setPollErrorDetail('');
     setPollTimeoutReached(false);
     setPollPausedByError(false);
   };
@@ -245,6 +284,7 @@ const AddChartAsync: React.FC = () => {
       setPollTimeoutReached(true);
       setPollPausedByError(false);
       setPollError(timeoutMessage);
+      setPollErrorDetail('');
       addEvent('timeout', timeoutMessage);
       message.warning(timeoutMessage);
       return;
@@ -253,10 +293,10 @@ const AddChartAsync: React.FC = () => {
     if (source === 'manual') {
       setManualRefreshing(true);
       setCountdown(POLL_INTERVAL_MS / 1000);
-    } else {
-      pollCountRef.current += 1;
-      setPollCount(pollCountRef.current);
     }
+
+    pollCountRef.current += 1;
+    setPollCount(pollCountRef.current);
 
     try {
       const res = await getChartTaskStatusUsingGET({ chartId: id });
@@ -265,14 +305,17 @@ const AddChartAsync: React.FC = () => {
       if (!res?.data) {
         const emptyMessage = '状态查询成功，但未返回任务详情，请稍后重试';
         setPollError(emptyMessage);
+        setPollErrorDetail('接口返回 data 为空，任务可能仍在排队中。建议等待 10-30 秒后再查询');
         addEvent('empty', emptyMessage);
         return;
       }
 
       errorCountRef.current = 0;
+      setConsecutiveErrorCount(0);
       setChartDetail(res.data);
       setPollPausedByError(false);
       setPollError('');
+      setPollErrorDetail('');
 
       if (res.data.status) {
         addEvent(res.data.status, getReadableEventText(res.data.status, res.data.execMessage));
@@ -284,18 +327,29 @@ const AddChartAsync: React.FC = () => {
           message.success('图表分析完成，可前往“我的图表”查看');
         } else {
           setPollError(buildFailureHint(res.data.execMessage));
+          setPollErrorDetail('');
         }
       }
     } catch (error: unknown) {
       errorCountRef.current += 1;
+      setConsecutiveErrorCount(errorCountRef.current);
       setLastPolledAt(new Date().toLocaleTimeString('zh-CN', { hour12: false }));
+
+      const rawError = getErrorMessage(error);
+      const readableError = getReadableError(error);
+      const pollErrorHint = getPollErrorHint(rawError);
 
       const errorMessage =
         errorCountRef.current >= MAX_CONSECUTIVE_ERRORS
-          ? '状态查询连续失败次数过多，已暂停自动追踪，请稍后手动刷新'
-          : `状态查询失败（连续 ${errorCountRef.current}/${MAX_CONSECUTIVE_ERRORS} 次）：${getReadableError(error)}`;
+          ? `状态查询连续失败 ${errorCountRef.current} 次，已暂停自动追踪`
+          : `状态查询失败（连续 ${errorCountRef.current}/${MAX_CONSECUTIVE_ERRORS} 次）：${pollErrorHint}`;
 
       setPollError(errorMessage);
+      setPollErrorDetail(
+        readableError === rawError
+          ? `异常原因：${readableError}`
+          : `异常原因：${readableError}\n原始错误：${rawError}`,
+      );
 
       if (errorCountRef.current >= MAX_CONSECUTIVE_ERRORS) {
         stopPolling();
@@ -337,6 +391,8 @@ const AddChartAsync: React.FC = () => {
     if (!pollTimeoutReached && !pollPausedByError) return;
 
     setPollError('');
+    setPollErrorDetail('');
+    setConsecutiveErrorCount(0);
     setPollPausedByError(false);
 
     const retryText = pollTimeoutReached
@@ -412,6 +468,9 @@ const AddChartAsync: React.FC = () => {
           maxRetry={MAX_RETRY}
           hintText={hintText}
           pollError={pollError}
+          pollErrorDetail={pollErrorDetail}
+          consecutiveErrorCount={consecutiveErrorCount}
+          maxConsecutiveErrors={MAX_CONSECUTIVE_ERRORS}
           lastPolledAt={lastPolledAt}
           onManualRefresh={() => chartId && fetchChartDetail(chartId, 'manual')}
           onRetryAutoPolling={onRetryAutoPolling}
@@ -434,6 +493,9 @@ const AddChartAsync: React.FC = () => {
           maxRetry={MAX_RETRY}
           hintText={hintText}
           pollError={pollError}
+          pollErrorDetail={pollErrorDetail}
+          consecutiveErrorCount={consecutiveErrorCount}
+          maxConsecutiveErrors={MAX_CONSECUTIVE_ERRORS}
           lastPolledAt={lastPolledAt}
           onManualRefresh={() => chartId && fetchChartDetail(chartId, 'manual')}
           onRetryAutoPolling={onRetryAutoPolling}
