@@ -19,6 +19,7 @@ import {
 } from 'antd';
 import TextArea from 'antd/es/input/TextArea';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { buildFailureHint, getTaskStatusText } from '../AddChartAsync/statusCopy';
 import { useForm } from 'antd/es/form/Form';
 import ReactECharts from 'echarts-for-react';
 
@@ -48,22 +49,9 @@ const AddChartAsync: React.FC = () => {
   const POLL_INTERVAL_MS = 120 * 1000;
   const MAX_RETRY = 10;
 
-  const statusText = useMemo(() => {
-    const status = chartDetail?.status;
-    if (status === 'wait') return '排队中';
-    if (status === 'running') return '分析执行中';
-    if (status === 'succeed') return '分析完成';
-    if (status === 'failed') return '分析失败';
-    return '未开始';
-  }, [chartDetail?.status]);
+  const statusText = useMemo(() => getTaskStatusText(chartDetail?.status), [chartDetail?.status]);
 
-  const getStatusLabel = (status?: string) => {
-    if (status === 'wait') return '排队中';
-    if (status === 'running') return '分析执行中';
-    if (status === 'succeed') return '分析完成';
-    if (status === 'failed') return '分析失败';
-    return '状态更新';
-  };
+  const getStatusLabel = (status?: string) => getTaskStatusText(status);
 
   const progressPercent = useMemo(() => {
     const status = chartDetail?.status;
@@ -155,7 +143,7 @@ const AddChartAsync: React.FC = () => {
         addEvent('error', '状态查询连续失败次数过多，已暂停自动追踪，请稍后手动刷新');
         message.error('状态查询连续失败次数过多，已暂停自动追踪，请稍后手动刷新');
       } else {
-        message.warning(`状态查询失败（连续 ${errorCountRef.current}/${MAX_RETRY} 次）`);
+        message.warning(`状态查询失败（连续 ${errorCountRef.current}/${MAX_RETRY} 次），系统将继续自动重试`);
       }
     }
   };
@@ -205,7 +193,7 @@ const AddChartAsync: React.FC = () => {
       form.resetFields();
       startPolling(id);
     } catch (e: any) {
-      message.error('分析失败，' + e.message);
+      message.error('分析失败，' + buildFailureHint(e.message));
     } finally {
       setSubmitting(false);
     }
@@ -245,9 +233,7 @@ const AddChartAsync: React.FC = () => {
         <Result
           status="error"
           title="分析失败"
-          subTitle={
-            chartDetail.execMessage || '任务执行失败，建议检查数据字段完整性、分析目标描述和图表类型后重试'
-          }
+          subTitle={buildFailureHint(chartDetail.execMessage)}
         />
       );
     }

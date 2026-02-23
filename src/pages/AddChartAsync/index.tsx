@@ -3,6 +3,7 @@ import { UploadOutlined } from '@ant-design/icons';
 import { Alert, Button, Card, Form, Input, message, Progress, Result, Select, Space, Tag, Upload } from 'antd';
 import TextArea from 'antd/es/input/TextArea';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { buildFailureHint, getTaskStatusText } from './statusCopy';
 import { useForm } from 'antd/es/form/Form';
 
 /**
@@ -33,13 +34,7 @@ const AddChartAsync: React.FC = () => {
   const MAX_RETRY = 40;
   const MAX_CONSECUTIVE_ERRORS = 5;
 
-  const statusText = useMemo(() => {
-    if (status === 'wait') return '排队中';
-    if (status === 'running') return '分析执行中';
-    if (status === 'succeed') return '分析完成';
-    if (status === 'failed') return '分析失败';
-    return '未开始';
-  }, [status]);
+  const statusText = useMemo(() => getTaskStatusText(status), [status]);
 
   const isTerminalStatus = status === 'succeed' || status === 'failed';
 
@@ -57,8 +52,7 @@ const AddChartAsync: React.FC = () => {
     if (status === 'wait') return '任务已入队，系统正在等待可用计算资源';
     if (status === 'running') return '任务执行中，可随时点击“立即刷新”获取最新进度';
     if (status === 'succeed') return '图表已生成完成，建议前往“我的图表”查看详情';
-    if (status === 'failed')
-      return execMessage || '任务执行失败，建议检查数据字段完整性、分析目标描述和图表类型后重试';
+    if (status === 'failed') return buildFailureHint(execMessage);
     return '系统正在处理中，请稍候';
   }, [chartId, execMessage, pollError, status]);
 
@@ -127,7 +121,7 @@ const AddChartAsync: React.FC = () => {
 
       if (data.status === 'failed') {
         stopPolling();
-        setPollError(data.execMessage || '分析失败，请检查数据后重试');
+        setPollError(buildFailureHint(data.execMessage));
       }
     } catch (e: any) {
       consecutiveErrorRef.current += 1;
@@ -248,7 +242,7 @@ const AddChartAsync: React.FC = () => {
           <Result
             status={status === 'failed' ? 'error' : status === 'succeed' ? 'success' : 'info'}
             title={statusText}
-            subTitle={execMessage || '系统正在处理中，请稍候'}
+            subTitle={status === 'failed' ? buildFailureHint(execMessage) : execMessage || '系统正在处理中，请稍候'}
             extra={
               <Space direction="vertical" size={8} style={{ width: 420, maxWidth: '100%' }}>
                 <Progress
