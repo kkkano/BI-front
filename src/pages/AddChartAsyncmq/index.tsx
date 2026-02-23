@@ -170,10 +170,18 @@ const AddChartAsync: React.FC = () => {
   const countdownTimerRef = useRef<ReturnType<typeof setInterval>>();
   const pollCountRef = useRef<number>(0);
   const errorCountRef = useRef<number>(0);
+  const activePollTaskIdRef = useRef<number>();
+  const pollSessionRef = useRef<number>(0);
+  const isMountedRef = useRef<boolean>(true);
 
   const POLL_INTERVAL_MS = 30 * 1000;
   const MAX_RETRY = 30;
   const MAX_CONSECUTIVE_ERRORS = 10;
+
+  const isCurrentPollSession = (id: number, session: number): boolean =>
+    isMountedRef.current &&
+    activePollTaskIdRef.current === id &&
+    pollSessionRef.current === session;
 
   const statusText = useMemo(() => {
     if (chartDetail?.status) {
@@ -241,7 +249,11 @@ const AddChartAsync: React.FC = () => {
       clearInterval(countdownTimerRef.current);
       countdownTimerRef.current = undefined;
     }
-    setCountdown(0);
+    pollSessionRef.current += 1;
+    if (isMountedRef.current) {
+      setManualRefreshing(false);
+      setCountdown(0);
+    }
   };
 
   const resetPollingState = () => {
@@ -276,17 +288,25 @@ const AddChartAsync: React.FC = () => {
     });
   };
 
-  const fetchChartDetail = async (id: number, source: PollSource = 'auto') => {
+  const fetchChartDetail = async (
+    id: number,
+    source: PollSource = 'auto',
+    session: number = pollSessionRef.current,
+  ) => {
+    if (!isCurrentPollSession(id, session)) {
+      return;
+    }
+
     if (source === 'auto' && pollCountRef.current >= MAX_RETRY) {
       const timeoutMessage =
         '自动追踪超时：已达到最大查询次数。你可以重试自动追踪，或稍后在“我的图表”查看最终结果';
-      stopPolling();
       setPollTimeoutReached(true);
       setPollPausedByError(false);
       setPollError(timeoutMessage);
       setPollErrorDetail('');
       addEvent('timeout', timeoutMessage);
       message.warning(timeoutMessage);
+      stopPolling();
       return;
     }
 
@@ -300,6 +320,10 @@ const AddChartAsync: React.FC = () => {
 
     try {
       const res = await getChartTaskStatusUsingGET({ chartId: id });
+      if (!isCurrentPollSession(id, session)) {
+        return;
+      }
+
       setLastPolledAt(new Date().toLocaleTimeString('zh-CN', { hour12: false }));
 
       if (!res?.data) {
@@ -331,6 +355,10 @@ const AddChartAsync: React.FC = () => {
         }
       }
     } catch (error: unknown) {
+      if (!isCurrentPollSession(id, session)) {
+        return;
+      }
+
       errorCountRef.current += 1;
       setConsecutiveErrorCount(errorCountRef.current);
       setLastPolledAt(new Date().toLocaleTimeString('zh-CN', { hour12: false }));
@@ -360,7 +388,7 @@ const AddChartAsync: React.FC = () => {
         addEvent('warning', errorMessage);
       }
     } finally {
-      if (source === 'manual') {
+      if (source === 'manual' && isCurrentPollSession(id, session)) {
         setManualRefreshing(false);
       }
     }
@@ -369,12 +397,17 @@ const AddChartAsync: React.FC = () => {
   const startPolling = (id: number) => {
     stopPolling();
     resetPollingState();
-    fetchChartDetail(id);
+
+    activePollTaskIdRef.current = id;
+    pollSessionRef.current += 1;
+    const session = pollSessionRef.current;
+
+    void fetchChartDetail(id, 'auto', session);
     setCountdown(POLL_INTERVAL_MS / 1000);
 
     timerRef.current = setInterval(() => {
       setCountdown(POLL_INTERVAL_MS / 1000);
-      fetchChartDetail(id);
+      void fetchChartDetail(id, 'auto', session);
     }, POLL_INTERVAL_MS);
 
     countdownTimerRef.current = setInterval(() => {
@@ -383,7 +416,10 @@ const AddChartAsync: React.FC = () => {
   };
 
   useEffect(() => {
-    return () => stopPolling();
+    return () => {
+      isMountedRef.current = false;
+      stopPolling();
+    };
   }, []);
 
   const onRetryAutoPolling = () => {
@@ -452,41 +488,25 @@ const AddChartAsync: React.FC = () => {
     onFinish(lastSubmitValues);
   };
 
-  const renderResult = () => {
-    if (!chartDetail) {
-      return (
-        <TaskProgressPanel
-          statusText={statusText}
-          progressPercent={Math.max(progressPercent, chartId ? 5 : 0)}
-          progressStatus={progressStatus}
-          countdown={countdown}
-          manualRefreshing={manualRefreshing}
-          isTerminalStatus={false}
-          pollTimeoutReached={pollTimeoutReached}
-          pollPausedByError={pollPausedByError}
-          pollCount={pollCount}
-          maxRetry={MAX_RETRY}
-          hintText={hintText}
-          pollError={pollError}
-          pollErrorDetail={pollErrorDetail}
-          consecutiveErrorCount={consecutiveErrorCount}
-          maxConsecutiveErrors={MAX_CONSECUTIVE_ERRORS}
-          lastPolledAt={lastPolledAt}
-          onManualRefresh={() => chartId && fetchChartDetail(chartId, 'manual')}
-          onRetryAutoPolling={onRetryAutoPolling}
-        />
-      );
+  const onManualRefresh = () => {
+    if (!chartId || manualRefreshing) {
+      return;
     }
+    void fetchChartDetail(chartId, 'manual', pollSessionRef.current);
+  };
 
-    if (chartDetail.status === 'wait' || chartDetail.status === 'running') {
+  const renderResult = () => {
+    if (!chartDetail || chartDetail.status === 'wait' || chartDetail.status === 'running') {
       return (
         <TaskProgressPanel
           statusText={statusText}
-          progressPercent={progressPercent}
+          progressPercent={
+            !chartDetail ? Math.max(progressPercent, chartId ? 5 : 0) : progressPercent
+          }
           progressStatus={progressStatus}
           countdown={countdown}
           manualRefreshing={manualRefreshing}
-          isTerminalStatus={isTerminalStatus}
+          isTerminalStatus={!!chartDetail && isTerminalStatus}
           pollTimeoutReached={pollTimeoutReached}
           pollPausedByError={pollPausedByError}
           pollCount={pollCount}
@@ -497,7 +517,7 @@ const AddChartAsync: React.FC = () => {
           consecutiveErrorCount={consecutiveErrorCount}
           maxConsecutiveErrors={MAX_CONSECUTIVE_ERRORS}
           lastPolledAt={lastPolledAt}
-          onManualRefresh={() => chartId && fetchChartDetail(chartId, 'manual')}
+          onManualRefresh={onManualRefresh}
           onRetryAutoPolling={onRetryAutoPolling}
         />
       );
