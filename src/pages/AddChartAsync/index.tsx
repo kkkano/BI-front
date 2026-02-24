@@ -200,16 +200,17 @@ const AddChartAsync: React.FC = () => {
     isTerminalStatus: (data) => isTerminalTaskStatus(data.status),
     onData: (data) => {
       const nextStatus = toTaskStatus(data.status);
+      const nextFailureMessage = data.failureReason || data.execMessage || '';
       const nextExecMessage = data.execMessage || '';
 
       setChartDetail(data);
       setStatus(nextStatus);
-      setExecMessage(nextExecMessage);
+      setExecMessage(nextFailureMessage || nextExecMessage);
 
       if (data.status) {
         const eventText =
           data.status === 'failed'
-            ? buildFailureHint(nextExecMessage)
+            ? buildFailureHint(nextFailureMessage || nextExecMessage)
             : nextExecMessage || getTaskStatusText(data.status);
         addEvent(data.status, eventText);
       }
@@ -282,9 +283,17 @@ const AddChartAsync: React.FC = () => {
     if (status === 'wait') return '任务已入队，系统正在等待可用计算资源';
     if (status === 'running') return '任务执行中，可随时点击“立即刷新”获取最新进度';
     if (status === 'succeed') return '图表已生成完成，建议前往“我的图表”查看详情';
-    if (status === 'failed') return buildFailureHint(execMessage);
+    if (status === 'failed') return buildFailureHint(chartDetail?.failureReason || execMessage);
     return '系统正在处理中，请稍候';
-  }, [chartId, execMessage, pollError, pollPausedByError, pollTimeoutReached, status]);
+  }, [
+    chartDetail?.failureReason,
+    chartId,
+    execMessage,
+    pollError,
+    pollPausedByError,
+    pollTimeoutReached,
+    status,
+  ]);
 
   const beforeUpload: UploadProps['beforeUpload'] = (file) => {
     const validationMessage = validateChartUploadFile(file);
@@ -336,10 +345,11 @@ const AddChartAsync: React.FC = () => {
       }
 
       const initialStatus = toTaskStatus(biResponse?.status || 'wait');
+      const initialFailureMessage = biResponse?.failureReason || biResponse?.execMessage || '';
       const initialExecMessage = biResponse?.execMessage || '';
       setChartId(id);
       setStatus(initialStatus);
-      setExecMessage(initialExecMessage);
+      setExecMessage(initialFailureMessage || initialExecMessage);
       setChartDetail({
         chartId: id,
         name: biResponse?.name,
@@ -349,6 +359,7 @@ const AddChartAsync: React.FC = () => {
         taskPhase: biResponse?.taskPhase,
         traceId: biResponse?.traceId,
         failureCode: biResponse?.failureCode,
+        failureReason: biResponse?.failureReason,
         failureTime: biResponse?.failureTime,
         execMessage: biResponse?.execMessage,
         createTime: biResponse?.createTime,
@@ -418,8 +429,9 @@ const AddChartAsync: React.FC = () => {
     }
 
     if (status === 'failed') {
-      const failureSummary = getFailureReasonSummary(execMessage);
-      const failureDetail = getFailureDetailText(execMessage);
+      const failureMessage = chartDetail?.failureReason || execMessage;
+      const failureSummary = getFailureReasonSummary(failureMessage);
+      const failureDetail = getFailureDetailText(failureMessage);
 
       return (
         <Result
@@ -432,7 +444,7 @@ const AddChartAsync: React.FC = () => {
                 type="error"
                 showIcon
                 message={
-                  failureSummary ? `失败摘要：${failureSummary}` : buildFailureHint(execMessage)
+                  failureSummary ? `失败摘要：${failureSummary}` : buildFailureHint(failureMessage)
                 }
               />
               <Card type="inner" size="small" title="执行追踪信息">
