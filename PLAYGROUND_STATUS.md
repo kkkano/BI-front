@@ -4,9 +4,9 @@
 
 ## 自动心跳（Auto)
 
-- Auto ping: **2026-02-24 19:37 CST (UTC+8)**
-- Latest commit: **46bd0bf**
-- Message: **feat: unify async chart task phase copy and visibility**
+- Auto ping: **2026-02-24 19:39 CST (UTC+8)**
+- Latest commit: **bc28d42**
+- Message: **feat: surface batch sync notices for unavailable and duplicate tasks**
 
 ## 当前阶段
 
