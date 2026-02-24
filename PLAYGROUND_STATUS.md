@@ -4,9 +4,9 @@
 
 ## 自动心跳（Auto)
 
-- Auto ping: **2026-02-24 13:22 CST (UTC+8)**
-- Latest commit: **7c92053**
-- Message: **feat(my-chart): chunk pending status polling and surface sync notice**
+- Auto ping: **2026-02-24 13:42 CST (UTC+8)**
+- Latest commit: **12786d4**
+- Message: **feat(async): expose task trace metadata and polling error details**
 
 ## 当前阶段
 
