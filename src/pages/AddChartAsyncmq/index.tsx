@@ -43,6 +43,7 @@ import {
   getFailureReasonSummary,
   getTaskStatusText,
 } from '../AddChartAsync/statusCopy';
+import { getTaskPhaseText } from '../AddChartAsync/taskPhase';
 import TaskProgressPanel from './components/TaskProgressPanel';
 
 type TaskEvent = {
@@ -97,6 +98,7 @@ const getReadableEventText = (
   status?: string,
   execMessage?: string,
   failureReason?: string,
+  taskPhase?: API.ChartTaskPhaseEnum,
 ): string => {
   if (status === 'failed') {
     return buildFailureHint(failureReason || execMessage);
@@ -105,10 +107,10 @@ const getReadableEventText = (
     return execMessage || '图表分析完成，可查看结论与可视化结果';
   }
   if (status === 'running') {
-    return execMessage || '任务执行中，正在生成图表和分析结论';
+    return execMessage || `任务执行中，当前阶段：${getTaskPhaseText(taskPhase)}`;
   }
   if (status === 'wait') {
-    return execMessage || '任务排队中，等待可用计算资源';
+    return execMessage || `任务排队中，当前阶段：${getTaskPhaseText(taskPhase)}`;
   }
   return execMessage || getTaskStatusText(status);
 };
@@ -199,6 +201,10 @@ const AddChartAsync: React.FC = () => {
   }, [chartDetail?.status, chartId]);
 
   const isTerminalStatus = isTerminalTaskStatus(chartDetail?.status);
+  const taskPhaseText = useMemo(
+    () => getTaskPhaseText(chartDetail?.taskPhase),
+    [chartDetail?.taskPhase],
+  );
 
   const addEvent = (status: string, text: string) => {
     setEvents((prev) => {
@@ -250,7 +256,7 @@ const AddChartAsync: React.FC = () => {
       if (data.status) {
         addEvent(
           data.status,
-          getReadableEventText(data.status, data.execMessage, data.failureReason),
+          getReadableEventText(data.status, data.execMessage, data.failureReason, data.taskPhase),
         );
       }
     },
@@ -528,6 +534,7 @@ const AddChartAsync: React.FC = () => {
           countdown={countdown}
           manualRefreshing={manualRefreshing}
           isTerminalStatus={!!chartDetail && isTerminalStatus}
+          taskPhaseText={taskPhaseText}
           pollTimeoutReached={pollTimeoutReached}
           pollPausedByError={pollPausedByError}
           pollCount={pollCount}
@@ -565,9 +572,7 @@ const AddChartAsync: React.FC = () => {
               />
               <Card type="inner" size="small" title="执行追踪信息">
                 <Descriptions size="small" bordered column={1}>
-                  <Descriptions.Item label="任务阶段">
-                    {getMetaText(chartDetail.taskPhase)}
-                  </Descriptions.Item>
+                  <Descriptions.Item label="任务阶段">{taskPhaseText}</Descriptions.Item>
                   <Descriptions.Item label="追踪 ID">
                     {getMetaText(chartDetail.traceId)}
                   </Descriptions.Item>
@@ -616,9 +621,7 @@ const AddChartAsync: React.FC = () => {
           {chartDetail.chartType && (
             <Descriptions.Item label="图表类型">{chartDetail.chartType}</Descriptions.Item>
           )}
-          <Descriptions.Item label="任务阶段">
-            {getMetaText(chartDetail.taskPhase)}
-          </Descriptions.Item>
+          <Descriptions.Item label="任务阶段">{taskPhaseText}</Descriptions.Item>
           <Descriptions.Item label="追踪 ID">{getMetaText(chartDetail.traceId)}</Descriptions.Item>
           <Descriptions.Item label="状态">{statusText}</Descriptions.Item>
         </Descriptions>
@@ -721,7 +724,7 @@ const AddChartAsync: React.FC = () => {
             type={pollError ? 'warning' : 'info'}
             showIcon
             style={{ marginBottom: 12 }}
-            message={`任务 #${chartId} · 当前状态：${statusText}`}
+            message={`任务 #${chartId} · 当前状态：${statusText} · 当前阶段：${taskPhaseText}`}
             description={`轮询进度 ${pollCount}/${MAX_RETRY}${!isTerminalStatus ? `，预计 ${countdown}s 后自动刷新` : ''}${lastPolledAt ? `，最近查询 ${lastPolledAt}` : ''}`}
           />
         ) : null}

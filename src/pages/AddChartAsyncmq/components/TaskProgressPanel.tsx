@@ -8,6 +8,7 @@ type TaskProgressPanelProps = {
   countdown: number;
   manualRefreshing: boolean;
   isTerminalStatus: boolean;
+  taskPhaseText: string;
   pollTimeoutReached: boolean;
   pollPausedByError: boolean;
   pollCount: number;
@@ -29,6 +30,7 @@ const TaskProgressPanel: React.FC<TaskProgressPanelProps> = ({
   countdown,
   manualRefreshing,
   isTerminalStatus,
+  taskPhaseText,
   pollTimeoutReached,
   pollPausedByError,
   pollCount,
@@ -90,6 +92,7 @@ const TaskProgressPanel: React.FC<TaskProgressPanelProps> = ({
             <Tag color="processing">
               已查询：{pollCount}/{maxRetry}
             </Tag>
+            <Tag color="geekblue">当前阶段：{taskPhaseText}</Tag>
             {pollError && consecutiveErrorCount > 0 ? (
               <Tag color={pollPausedByError ? 'error' : 'warning'}>
                 连续失败：{consecutiveErrorCount}/{maxConsecutiveErrors}
