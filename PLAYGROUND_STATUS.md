@@ -4,9 +4,9 @@
 
 ## 自动心跳（Auto)
 
-- Auto ping: **2026-02-24 19:29 CST (UTC+8)**
-- Latest commit: **b14eea0**
-- Message: **fix(polling): exclude manual refresh from auto retry quota**
+- Auto ping: **2026-02-24 19:37 CST (UTC+8)**
+- Latest commit: **46bd0bf**
+- Message: **feat: unify async chart task phase copy and visibility**
 
 ## 当前阶段
 
