@@ -4,9 +4,9 @@
 
 ## 自动心跳（Auto)
 
-- Auto ping: **2026-02-24 13:42 CST (UTC+8)**
-- Latest commit: **12786d4**
-- Message: **feat(async): expose task trace metadata and polling error details**
+- Auto ping: **2026-02-24 18:47 CST (UTC+8)**
+- Latest commit: **8a8c763**
+- Message: **fix: prevent overlapping chart task polling requests**
 
 ## 当前阶段
 
