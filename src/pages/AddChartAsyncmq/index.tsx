@@ -45,6 +45,7 @@ import {
 } from '../AddChartAsync/statusCopy';
 import { getTaskPhaseText } from '../AddChartAsync/taskPhase';
 import TaskProgressPanel from './components/TaskProgressPanel';
+import { getAutoRefreshDisplay } from './pollingDisplay';
 
 type TaskEvent = {
   status: string;
@@ -432,6 +433,18 @@ const AddChartAsync: React.FC = () => {
     return 'active';
   }, [chartDetail?.status]);
 
+  const autoRefreshDisplay = useMemo(
+    () =>
+      getAutoRefreshDisplay({
+        isTerminalStatus,
+        countdown,
+        manualRefreshing,
+        pollTimeoutReached,
+        pollPausedByError,
+      }),
+    [countdown, isTerminalStatus, manualRefreshing, pollPausedByError, pollTimeoutReached],
+  );
+
   const beforeUpload: UploadProps['beforeUpload'] = (file) => {
     const validationMessage = validateChartUploadFile(file);
     if (validationMessage) {
@@ -725,7 +738,7 @@ const AddChartAsync: React.FC = () => {
             showIcon
             style={{ marginBottom: 12 }}
             message={`任务 #${chartId} · 当前状态：${statusText} · 当前阶段：${taskPhaseText}`}
-            description={`轮询进度 ${pollCount}/${MAX_RETRY}${!isTerminalStatus ? `，预计 ${countdown}s 后自动刷新` : ''}${lastPolledAt ? `，最近查询 ${lastPolledAt}` : ''}`}
+            description={`轮询进度 ${pollCount}/${MAX_RETRY}${autoRefreshDisplay?.summaryText || ''}${lastPolledAt ? `，最近查询 ${lastPolledAt}` : ''}`}
           />
         ) : null}
         <Steps size="small" responsive items={stageItems} style={{ marginBottom: 12 }} />

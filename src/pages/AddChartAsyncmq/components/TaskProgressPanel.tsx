@@ -1,5 +1,6 @@
 import { Alert, Button, Progress, Result, Space, Tag, Typography } from 'antd';
 import React from 'react';
+import { getAutoRefreshDisplay } from '../pollingDisplay';
 
 type TaskProgressPanelProps = {
   statusText: string;
@@ -55,6 +56,14 @@ const TaskProgressPanel: React.FC<TaskProgressPanelProps> = ({
         ? '可先点击“立即刷新”确认最新状态，再决定是否继续等待。'
         : '系统会继续自动刷新，你也可以随时手动刷新查看最新进度。';
 
+  const autoRefreshDisplay = getAutoRefreshDisplay({
+    isTerminalStatus,
+    countdown,
+    manualRefreshing,
+    pollTimeoutReached,
+    pollPausedByError,
+  });
+
   return (
     <Result
       status="info"
@@ -84,9 +93,9 @@ const TaskProgressPanel: React.FC<TaskProgressPanelProps> = ({
                 {retryButtonText}
               </Button>
             ) : null}
-            {!isTerminalStatus ? (
-              <Tag color={countdown <= 3 ? 'orange' : 'blue'}>
-                下次自动刷新：{manualRefreshing ? '同步中...' : `${countdown}s`}
+            {autoRefreshDisplay ? (
+              <Tag color={autoRefreshDisplay.tagColor}>
+                {autoRefreshDisplay.tagPrefix}：{autoRefreshDisplay.tagValue}
               </Tag>
             ) : null}
             <Tag color="processing">
