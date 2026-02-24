@@ -4,9 +4,9 @@
 
 ## 自动心跳（Auto)
 
-- Auto ping: **2026-02-24 19:54 CST (UTC+8)**
-- Latest commit: **5fff714**
-- Message: **fix: correct async polling pause hints in AddChartAsyncmq**
+- Auto ping: **2026-02-24 20:03 CST (UTC+8)**
+- Latest commit: **ebc74ba**
+- Message: **fix(polling): prioritize manual sync indicator over paused states**
 
 ## 当前阶段
 
