@@ -4,9 +4,9 @@
 
 ## 自动心跳（Auto)
 
-- Auto ping: **2026-02-24 10:24 CST (UTC+8)**
-- Latest commit: **7a7bfe3**
-- Message: **feat(my-chart): consume batch detail status api**
+- Auto ping: **2026-02-24 13:22 CST (UTC+8)**
+- Latest commit: **7c92053**
+- Message: **feat(my-chart): chunk pending status polling and surface sync notice**
 
 ## 当前阶段
 
