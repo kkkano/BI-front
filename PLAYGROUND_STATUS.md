@@ -4,9 +4,9 @@
 
 ## 自动心跳（Auto)
 
-- Auto ping: **2026-02-24 07:22 CST (UTC+8)**
-- Latest commit: **dc3df0b**
-- Message: **feat(upload): unify chart file validation across generation pages**
+- Auto ping: **2026-02-24 10:24 CST (UTC+8)**
+- Latest commit: **7a7bfe3**
+- Message: **feat(my-chart): consume batch detail status api**
 
 ## 当前阶段
 
