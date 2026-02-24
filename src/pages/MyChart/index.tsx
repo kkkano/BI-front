@@ -287,6 +287,7 @@ const MyChartPage: React.FC = () => {
       const taskStatusList: API.ChartTaskStatusVO[] = [];
       const unavailableChartIdSet = new Set<number>();
       let successChunkCount = 0;
+      let duplicateCount = 0;
 
       batchResults.forEach((result) => {
         if (result.status !== 'fulfilled') {
@@ -294,11 +295,14 @@ const MyChartPage: React.FC = () => {
         }
         successChunkCount += 1;
 
-        result.value?.data?.taskStatusList?.forEach((taskStatus) => {
+        const batchData = result.value?.data;
+        duplicateCount += batchData?.duplicateCount ?? 0;
+
+        batchData?.taskStatusList?.forEach((taskStatus) => {
           taskStatusList.push(taskStatus);
         });
 
-        result.value?.data?.unavailableChartIds?.forEach((chartId) => {
+        batchData?.unavailableChartIds?.forEach((chartId) => {
           if (typeof chartId === 'number') {
             unavailableChartIdSet.add(chartId);
           }
@@ -309,10 +313,11 @@ const MyChartPage: React.FC = () => {
         throw new Error('all task status batch requests failed');
       }
 
+      const pollingNotices: string[] = [];
       if (successChunkCount < pendingChartIdChunks.length) {
-        setPollingNotice(`部分图表状态同步失败（${successChunkCount}/${pendingChartIdChunks.length} 批次成功）`);
-      } else {
-        setPollingNotice(undefined);
+        pollingNotices.push(
+          `部分图表状态同步失败（${successChunkCount}/${pendingChartIdChunks.length} 批次成功）`,
+        );
       }
 
       const unavailableChartIds = Array.from(unavailableChartIdSet);
@@ -331,8 +336,15 @@ const MyChartPage: React.FC = () => {
             ),
           );
           setTotal((prev) => Math.max(prev - unavailableChartIdsInCurrentList.size, 0));
+          pollingNotices.push(`已移除 ${unavailableChartIdsInCurrentList.size} 个不可用任务`);
         }
       }
+
+      if (duplicateCount > 0) {
+        pollingNotices.push(`本轮查询已自动去重 ${duplicateCount} 个重复任务`);
+      }
+
+      setPollingNotice(pollingNotices.length > 0 ? pollingNotices.join('；') : undefined);
 
       const taskStatusMap = new Map<number, API.ChartTaskStatusVO>();
       taskStatusList.forEach((taskStatus) => {

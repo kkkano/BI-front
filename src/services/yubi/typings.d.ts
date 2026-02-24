@@ -169,8 +169,12 @@ declare namespace API {
   };
 
   type ChartTaskStatusBatchVO = {
+    rawRequestedCount?: number;
     requestedCount?: number;
+    duplicateCount?: number;
+    duplicateChartIds?: number[];
     returnedCount?: number;
+    unavailableCount?: number;
     unavailableChartIds?: number[];
     taskStatusList?: ChartTaskStatusVO[];
   };
