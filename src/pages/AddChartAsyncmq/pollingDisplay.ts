@@ -23,6 +23,16 @@ export const getAutoRefreshDisplay = (
     return null;
   }
 
+  // 手动刷新时优先反馈“同步中”，避免在超时/暂停态下点击刷新后无感知。
+  if (manualRefreshing) {
+    return {
+      tagPrefix: '自动追踪',
+      tagValue: '同步中...',
+      tagColor: 'processing',
+      summaryText: '，正在同步最新状态',
+    };
+  }
+
   if (pollTimeoutReached) {
     return {
       tagPrefix: '自动追踪',
@@ -38,15 +48,6 @@ export const getAutoRefreshDisplay = (
       tagValue: '已因连续失败暂停',
       tagColor: 'warning',
       summaryText: '，自动追踪已因连续查询失败暂停',
-    };
-  }
-
-  if (manualRefreshing) {
-    return {
-      tagPrefix: '自动追踪',
-      tagValue: '同步中...',
-      tagColor: 'processing',
-      summaryText: '，正在同步最新状态',
     };
   }
 

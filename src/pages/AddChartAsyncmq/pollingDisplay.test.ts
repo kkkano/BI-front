@@ -1,6 +1,23 @@
 import { getAutoRefreshDisplay } from './pollingDisplay';
 
 describe('getAutoRefreshDisplay', () => {
+  it('should return syncing state when manual refresh is running', () => {
+    const display = getAutoRefreshDisplay({
+      isTerminalStatus: false,
+      countdown: 10,
+      manualRefreshing: true,
+      pollTimeoutReached: true,
+      pollPausedByError: true,
+    });
+
+    expect(display).toEqual({
+      tagPrefix: '自动追踪',
+      tagValue: '同步中...',
+      tagColor: 'processing',
+      summaryText: '，正在同步最新状态',
+    });
+  });
+
   it('should return paused timeout text when timeout reached', () => {
     const display = getAutoRefreshDisplay({
       isTerminalStatus: false,
@@ -46,6 +63,23 @@ describe('getAutoRefreshDisplay', () => {
       tagValue: '2s',
       tagColor: 'orange',
       summaryText: '，预计 2s 后自动刷新',
+    });
+  });
+
+  it('should clamp negative countdown to zero', () => {
+    const display = getAutoRefreshDisplay({
+      isTerminalStatus: false,
+      countdown: -5,
+      manualRefreshing: false,
+      pollTimeoutReached: false,
+      pollPausedByError: false,
+    });
+
+    expect(display).toEqual({
+      tagPrefix: '下次自动刷新',
+      tagValue: '0s',
+      tagColor: 'orange',
+      summaryText: '，预计 0s 后自动刷新',
     });
   });
 
