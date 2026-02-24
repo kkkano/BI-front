@@ -4,9 +4,9 @@
 
 ## 自动心跳（Auto)
 
-- Auto ping: **2026-02-24 18:47 CST (UTC+8)**
-- Latest commit: **8a8c763**
-- Message: **fix: prevent overlapping chart task polling requests**
+- Auto ping: **2026-02-24 18:55 CST (UTC+8)**
+- Latest commit: **24e783b**
+- Message: **feat(chart-ui): improve failed-task reason parsing and fallback fields**
 
 ## 当前阶段
 
