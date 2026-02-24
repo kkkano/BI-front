@@ -4,9 +4,9 @@
 
 ## 自动心跳（Auto)
 
-- Auto ping: **2026-02-24 18:55 CST (UTC+8)**
-- Latest commit: **24e783b**
-- Message: **feat(chart-ui): improve failed-task reason parsing and fallback fields**
+- Auto ping: **2026-02-24 19:29 CST (UTC+8)**
+- Latest commit: **b14eea0**
+- Message: **fix(polling): exclude manual refresh from auto retry quota**
 
 ## 当前阶段
 
