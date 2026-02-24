@@ -1,6 +1,6 @@
 import {
   deleteChartUsingPOST,
-  getChartTaskStatusBatchUsingPOST,
+  getChartTaskStatusBatchDetailUsingPOST,
   listMyChartByPageUsingPOST,
 } from '@/services/yubi/chartController';
 import { getErrorMessage, parseChartOption } from '@/utils/chart';
@@ -43,6 +43,13 @@ const STATUS_CONFIG: Record<string, { color: string; label: string; shortLabel: 
 
 const POLLING_INTERVAL = 5000;
 const POLLING_INTERVAL_SECONDS = POLLING_INTERVAL / 1000;
+
+const formatRefreshTimestamp = (): string =>
+  new Date().toLocaleTimeString('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
 
 const PREVIEW_HINT_TEXT: Record<string, string> = {
   wait: '图表排队中，状态更新后可预览',
@@ -87,6 +94,11 @@ const mergeChartTaskStatus = (chart: API.Chart, taskStatus: API.ChartTaskStatusV
   goal: taskStatus.goal ?? chart.goal,
   chartType: taskStatus.chartType ?? chart.chartType,
   status: taskStatus.status ?? chart.status,
+  taskPhase: taskStatus.taskPhase ?? chart.taskPhase,
+  traceId: taskStatus.traceId ?? chart.traceId,
+  failureCode: taskStatus.failureCode ?? chart.failureCode,
+  failureReason: taskStatus.failureReason ?? chart.failureReason,
+  failureTime: taskStatus.failureTime ?? chart.failureTime,
   execMessage: taskStatus.execMessage ?? chart.execMessage,
   genChart: taskStatus.genChart ?? chart.genChart,
   genResult: taskStatus.genResult ?? chart.genResult,
@@ -254,17 +266,23 @@ const MyChartPage: React.FC = () => {
     pollingRequestingRef.current = true;
     setRefreshingPending(true);
     try {
-      const res = await getChartTaskStatusBatchUsingPOST({ chartIds: pendingChartIds });
-      const taskStatusList = res?.data ?? [];
-      if (!taskStatusList.length) {
-        setLastRefreshTime(
-          new Date().toLocaleTimeString('zh-CN', {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-          }),
-        );
-        return;
+      const res = await getChartTaskStatusBatchDetailUsingPOST({ chartIds: pendingChartIds });
+      const taskStatusList = res?.data?.taskStatusList ?? [];
+      const unavailableChartIds = res?.data?.unavailableChartIds ?? [];
+
+      if (unavailableChartIds.length > 0) {
+        const unavailableChartIdSet = new Set(unavailableChartIds);
+        const removedCount = chartListRef.current.filter(
+          (chart) => typeof chart.id === 'number' && unavailableChartIdSet.has(chart.id),
+        ).length;
+        if (removedCount > 0) {
+          setChartList((prev) =>
+            prev.filter(
+              (chart) => !(typeof chart.id === 'number' && unavailableChartIdSet.has(chart.id)),
+            ),
+          );
+          setTotal((prev) => Math.max(prev - removedCount, 0));
+        }
       }
 
       const taskStatusMap = new Map<number, API.ChartTaskStatusVO>();
@@ -273,36 +291,22 @@ const MyChartPage: React.FC = () => {
           taskStatusMap.set(taskStatus.chartId, taskStatus);
         }
       });
-      if (taskStatusMap.size === 0) {
-        setLastRefreshTime(
-          new Date().toLocaleTimeString('zh-CN', {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
+      if (taskStatusMap.size > 0) {
+        setChartList((prev) =>
+          prev.map((chart) => {
+            if (typeof chart.id !== 'number') {
+              return chart;
+            }
+            const taskStatus = taskStatusMap.get(chart.id);
+            if (!taskStatus) {
+              return chart;
+            }
+            return mergeChartTaskStatus(chart, taskStatus);
           }),
         );
-        return;
       }
 
-      setChartList((prev) =>
-        prev.map((chart) => {
-          if (typeof chart.id !== 'number') {
-            return chart;
-          }
-          const taskStatus = taskStatusMap.get(chart.id);
-          if (!taskStatus) {
-            return chart;
-          }
-          return mergeChartTaskStatus(chart, taskStatus);
-        }),
-      );
-      setLastRefreshTime(
-        new Date().toLocaleTimeString('zh-CN', {
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-        }),
-      );
+      setLastRefreshTime(formatRefreshTimestamp());
     } catch (_error: unknown) {
       return;
     } finally {
@@ -396,7 +400,7 @@ const MyChartPage: React.FC = () => {
   const openFailureDetail = (item: API.Chart) => {
     setFailureDetail({
       title: item.name || '未命名图表',
-      message: item.execMessage || '暂无详细错误信息，请稍后重试',
+      message: item.failureReason || item.execMessage || '暂无详细错误信息，请稍后重试',
     });
   };
 
@@ -670,7 +674,8 @@ const MyChartPage: React.FC = () => {
                     />
                     <Card type="inner" size="small" title="失败原因" style={{ marginBottom: 8 }}>
                       {(() => {
-                        const fullMessage = item.execMessage || '暂无详细错误信息，请稍后重试';
+                        const fullMessage =
+                          item.failureReason || item.execMessage || '暂无详细错误信息，请稍后重试';
                         const summary = getFailureSummary(fullMessage);
                         const previewLength = getFailurePreviewLength(isMobile);
                         const previewMessage = truncateText(fullMessage, previewLength);

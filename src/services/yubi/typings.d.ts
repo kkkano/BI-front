@@ -22,6 +22,12 @@ declare namespace API {
     message?: string;
   };
 
+  type BaseResponseChartTaskStatusBatchVO_ = {
+    code?: number;
+    data?: ChartTaskStatusBatchVO;
+    message?: string;
+  };
+
   type BaseResponseInt_ = {
     code?: number;
     data?: number;
@@ -113,6 +119,7 @@ declare namespace API {
     taskPhase?: ChartTaskPhaseEnum;
     traceId?: string;
     failureCode?: string;
+    failureReason?: string;
     failureTime?: string;
     execMessage?: string;
     genChart?: string;
@@ -127,6 +134,7 @@ declare namespace API {
     createTime?: string;
     execMessage?: string;
     failureCode?: string;
+    failureReason?: string;
     failureTime?: string;
     genChart?: string;
     genResult?: string;
@@ -160,6 +168,13 @@ declare namespace API {
     chartIds?: number[];
   };
 
+  type ChartTaskStatusBatchVO = {
+    requestedCount?: number;
+    returnedCount?: number;
+    unavailableChartIds?: number[];
+    taskStatusList?: ChartTaskStatusVO[];
+  };
+
   type ChartTaskStatusVO = {
     chartId?: number;
     name?: string;
@@ -168,6 +183,7 @@ declare namespace API {
     taskPhase?: ChartTaskPhaseEnum;
     traceId?: string;
     failureCode?: string;
+    failureReason?: string;
     failureTime?: string;
     execMessage?: string;
     genChart?: string;

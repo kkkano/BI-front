@@ -200,6 +200,21 @@ export async function getChartTaskStatusBatchUsingPOST(
   });
 }
 
+/** getChartTaskStatusBatchDetail POST /api/chart/task/status/batch/detail */
+export async function getChartTaskStatusBatchDetailUsingPOST(
+  body: API.ChartTaskStatusBatchRequest,
+  options?: { [key: string]: any },
+) {
+  return request<API.BaseResponseChartTaskStatusBatchVO_>('/api/chart/task/status/batch/detail', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: body,
+    ...(options || {}),
+  });
+}
+
 /** listChartByPage POST /api/chart/list/page */
 export async function listChartByPageUsingPOST(
   body: API.ChartQueryRequest,
