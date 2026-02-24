@@ -114,6 +114,25 @@ const toTaskStatus = (status?: string): TaskStatus => {
   return 'running';
 };
 
+const getMetaText = (value?: string): string => {
+  if (!value) {
+    return '-';
+  }
+  const trimmedValue = value.trim();
+  return trimmedValue || '-';
+};
+
+const formatDateTime = (value?: string): string => {
+  if (!value) {
+    return '-';
+  }
+  const parsedDate = new Date(value);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return value;
+  }
+  return parsedDate.toLocaleString('zh-CN', { hour12: false });
+};
+
 /**
  * 添加图表（异步 线程池）页面
  * 优化点：
@@ -160,6 +179,7 @@ const AddChartAsync: React.FC = () => {
     countdown,
     pollCount,
     pollError,
+    pollErrorDetail,
     lastPolledAt,
     manualRefreshing,
     pollTimeoutReached,
@@ -327,6 +347,9 @@ const AddChartAsync: React.FC = () => {
         chartType: biResponse?.chartType,
         status: biResponse?.status || 'wait',
         taskPhase: biResponse?.taskPhase,
+        traceId: biResponse?.traceId,
+        failureCode: biResponse?.failureCode,
+        failureTime: biResponse?.failureTime,
         execMessage: biResponse?.execMessage,
         createTime: biResponse?.createTime,
         updateTime: biResponse?.updateTime,
@@ -369,6 +392,12 @@ const AddChartAsync: React.FC = () => {
             ) : null}
             <Descriptions.Item label="状态">{statusText}</Descriptions.Item>
             <Descriptions.Item label="执行阶段">{taskPhaseText}</Descriptions.Item>
+            <Descriptions.Item label="追踪 ID">
+              {getMetaText(chartDetail?.traceId)}
+            </Descriptions.Item>
+            <Descriptions.Item label="最近更新时间">
+              {formatDateTime(chartDetail?.updateTime)}
+            </Descriptions.Item>
           </Descriptions>
           <Card type="inner" title="分析结论" style={{ marginBottom: 16 }}>
             {chartDetail?.genResult || '暂无'}
@@ -406,6 +435,20 @@ const AddChartAsync: React.FC = () => {
                   failureSummary ? `失败摘要：${failureSummary}` : buildFailureHint(execMessage)
                 }
               />
+              <Card type="inner" size="small" title="执行追踪信息">
+                <Descriptions size="small" bordered column={1}>
+                  <Descriptions.Item label="任务阶段">{taskPhaseText}</Descriptions.Item>
+                  <Descriptions.Item label="追踪 ID">
+                    {getMetaText(chartDetail?.traceId)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="失败代码">
+                    {getMetaText(chartDetail?.failureCode)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="失败时间">
+                    {formatDateTime(chartDetail?.failureTime)}
+                  </Descriptions.Item>
+                </Descriptions>
+              </Card>
               {failureDetail ? (
                 <Typography.Paragraph
                   copyable
@@ -463,7 +506,12 @@ const AddChartAsync: React.FC = () => {
               </Tag>
               {lastPolledAt ? <Tag>最近查询：{lastPolledAt}</Tag> : null}
             </Space>
-            <Alert showIcon type={pollError ? 'warning' : 'info'} message={hintText} />
+            <Alert
+              showIcon
+              type={pollError ? 'warning' : 'info'}
+              message={hintText}
+              description={pollErrorDetail || undefined}
+            />
           </Space>
         }
       />
