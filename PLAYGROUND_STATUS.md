@@ -4,9 +4,9 @@
 
 ## 自动心跳（Auto)
 
-- Auto ping: **2026-02-24 19:39 CST (UTC+8)**
-- Latest commit: **bc28d42**
-- Message: **feat: surface batch sync notices for unavailable and duplicate tasks**
+- Auto ping: **2026-02-24 19:54 CST (UTC+8)**
+- Latest commit: **5fff714**
+- Message: **fix: correct async polling pause hints in AddChartAsyncmq**
 
 ## 当前阶段
 
