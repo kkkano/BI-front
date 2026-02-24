@@ -100,6 +100,8 @@ export function useChartTaskPolling<TData>(
   const errorCountRef = useRef<number>(0);
   const activeTaskIdRef = useRef<number>();
   const pollSessionRef = useRef<number>(0);
+  const inFlightTaskIdRef = useRef<number>();
+  const inFlightSessionRef = useRef<number>();
   const isMountedRef = useRef<boolean>(true);
 
   const isCurrentPollSession = useCallback((taskId: number, session: number): boolean => {
@@ -108,6 +110,22 @@ export function useChartTaskPolling<TData>(
       activeTaskIdRef.current === taskId &&
       pollSessionRef.current === session
     );
+  }, []);
+
+  const isRequestInFlight = useCallback((taskId: number, session: number): boolean => {
+    return inFlightTaskIdRef.current === taskId && inFlightSessionRef.current === session;
+  }, []);
+
+  const markRequestInFlight = useCallback((taskId: number, session: number): void => {
+    inFlightTaskIdRef.current = taskId;
+    inFlightSessionRef.current = session;
+  }, []);
+
+  const clearRequestInFlight = useCallback((taskId: number, session: number): void => {
+    if (inFlightTaskIdRef.current === taskId && inFlightSessionRef.current === session) {
+      inFlightTaskIdRef.current = undefined;
+      inFlightSessionRef.current = undefined;
+    }
   }, []);
 
   const stopPolling = useCallback(() => {
@@ -119,6 +137,8 @@ export function useChartTaskPolling<TData>(
       clearInterval(countdownTimerRef.current);
       countdownTimerRef.current = undefined;
     }
+    inFlightTaskIdRef.current = undefined;
+    inFlightSessionRef.current = undefined;
     pollSessionRef.current += 1;
     if (isMountedRef.current) {
       setManualRefreshing(false);
@@ -162,6 +182,12 @@ export function useChartTaskPolling<TData>(
         stopPolling();
         return;
       }
+
+      // 避免同一任务在同一轮询会话内并发触发多个请求，导致状态乱序或计数失真
+      if (isRequestInFlight(taskId, session)) {
+        return;
+      }
+      markRequestInFlight(taskId, session);
 
       if (source === 'manual' && isMountedRef.current) {
         setManualRefreshing(true);
@@ -245,19 +271,23 @@ export function useChartTaskPolling<TData>(
           consecutiveErrorCount: errorCountRef.current,
         });
       } finally {
+        clearRequestInFlight(taskId, session);
         if (source === 'manual' && isCurrentPollSession(taskId, session) && isMountedRef.current) {
           setManualRefreshing(false);
         }
       }
     },
     [
+      clearRequestInFlight,
       fetchStatus,
       formatEmptyMessage,
       formatErrorMessage,
       formatTimeoutMessage,
       getLastPolledAt,
       isCurrentPollSession,
+      isRequestInFlight,
       isTerminalStatus,
+      markRequestInFlight,
       maxConsecutiveErrors,
       maxRetry,
       onData,
@@ -304,12 +334,13 @@ export function useChartTaskPolling<TData>(
   const pollNow = useCallback(
     (taskId?: number) => {
       const nextTaskId = taskId ?? activeTaskIdRef.current;
-      if (!nextTaskId || manualRefreshing) {
+      const session = pollSessionRef.current;
+      if (!nextTaskId || manualRefreshing || isRequestInFlight(nextTaskId, session)) {
         return;
       }
-      void runPolling(nextTaskId, 'manual', pollSessionRef.current);
+      void runPolling(nextTaskId, 'manual', session);
     },
-    [manualRefreshing, runPolling],
+    [isRequestInFlight, manualRefreshing, runPolling],
   );
 
   const retryAutoPolling = useCallback(
