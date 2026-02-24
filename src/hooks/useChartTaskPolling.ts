@@ -194,9 +194,12 @@ export function useChartTaskPolling<TData>(
         setCountdown(pollIntervalMs / 1000);
       }
 
-      pollCountRef.current += 1;
-      if (isMountedRef.current) {
-        setPollCount(pollCountRef.current);
+      // 仅自动轮询计入重试次数，避免用户手动刷新过多导致自动追踪提前超时
+      if (source === 'auto') {
+        pollCountRef.current += 1;
+        if (isMountedRef.current) {
+          setPollCount(pollCountRef.current);
+        }
       }
 
       try {
