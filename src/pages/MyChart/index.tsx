@@ -43,6 +43,7 @@ const STATUS_CONFIG: Record<string, { color: string; label: string; shortLabel: 
 
 const POLLING_INTERVAL = 5000;
 const POLLING_INTERVAL_SECONDS = POLLING_INTERVAL / 1000;
+const TASK_STATUS_BATCH_SIZE = 20;
 
 const formatRefreshTimestamp = (): string =>
   new Date().toLocaleTimeString('zh-CN', {
@@ -87,6 +88,17 @@ const statusToResultStatus = (status?: string): 'warning' | 'info' | 'success' |
 
 const isPendingChart = (chart?: API.Chart): boolean =>
   chart?.status === 'wait' || chart?.status === 'running';
+
+const chunkArray = <T,>(items: T[], chunkSize: number): T[][] => {
+  if (chunkSize <= 0) {
+    return [items];
+  }
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += chunkSize) {
+    chunks.push(items.slice(i, i + chunkSize));
+  }
+  return chunks;
+};
 
 const mergeChartTaskStatus = (chart: API.Chart, taskStatus: API.ChartTaskStatusVO): API.Chart => ({
   ...chart,
@@ -165,6 +177,7 @@ const MyChartPage: React.FC = () => {
   const [refreshingPending, setRefreshingPending] = useState<boolean>(false);
   const [refreshCountdown, setRefreshCountdown] = useState<number>(POLLING_INTERVAL_SECONDS);
   const [lastRefreshTime, setLastRefreshTime] = useState<string>();
+  const [pollingNotice, setPollingNotice] = useState<string>();
   const [previewChart, setPreviewChart] = useState<{ title: string; option: EChartsOption } | null>(
     null,
   );
@@ -266,22 +279,58 @@ const MyChartPage: React.FC = () => {
     pollingRequestingRef.current = true;
     setRefreshingPending(true);
     try {
-      const res = await getChartTaskStatusBatchDetailUsingPOST({ chartIds: pendingChartIds });
-      const taskStatusList = res?.data?.taskStatusList ?? [];
-      const unavailableChartIds = res?.data?.unavailableChartIds ?? [];
+      const pendingChartIdChunks = chunkArray(pendingChartIds, TASK_STATUS_BATCH_SIZE);
+      const batchResults = await Promise.allSettled(
+        pendingChartIdChunks.map((chartIds) => getChartTaskStatusBatchDetailUsingPOST({ chartIds })),
+      );
 
+      const taskStatusList: API.ChartTaskStatusVO[] = [];
+      const unavailableChartIdSet = new Set<number>();
+      let successChunkCount = 0;
+
+      batchResults.forEach((result) => {
+        if (result.status !== 'fulfilled') {
+          return;
+        }
+        successChunkCount += 1;
+
+        result.value?.data?.taskStatusList?.forEach((taskStatus) => {
+          taskStatusList.push(taskStatus);
+        });
+
+        result.value?.data?.unavailableChartIds?.forEach((chartId) => {
+          if (typeof chartId === 'number') {
+            unavailableChartIdSet.add(chartId);
+          }
+        });
+      });
+
+      if (successChunkCount === 0) {
+        throw new Error('all task status batch requests failed');
+      }
+
+      if (successChunkCount < pendingChartIdChunks.length) {
+        setPollingNotice(`部分图表状态同步失败（${successChunkCount}/${pendingChartIdChunks.length} 批次成功）`);
+      } else {
+        setPollingNotice(undefined);
+      }
+
+      const unavailableChartIds = Array.from(unavailableChartIdSet);
       if (unavailableChartIds.length > 0) {
-        const unavailableChartIdSet = new Set(unavailableChartIds);
-        const removedCount = chartListRef.current.filter(
-          (chart) => typeof chart.id === 'number' && unavailableChartIdSet.has(chart.id),
-        ).length;
-        if (removedCount > 0) {
+        const unavailableChartIdsInCurrentList = new Set<number>(
+          chartListRef.current
+            .filter((chart) => typeof chart.id === 'number' && unavailableChartIdSet.has(chart.id))
+            .map((chart) => chart.id as number),
+        );
+
+        if (unavailableChartIdsInCurrentList.size > 0) {
           setChartList((prev) =>
             prev.filter(
-              (chart) => !(typeof chart.id === 'number' && unavailableChartIdSet.has(chart.id)),
+              (chart) =>
+                !(typeof chart.id === 'number' && unavailableChartIdsInCurrentList.has(chart.id)),
             ),
           );
-          setTotal((prev) => Math.max(prev - removedCount, 0));
+          setTotal((prev) => Math.max(prev - unavailableChartIdsInCurrentList.size, 0));
         }
       }
 
@@ -308,7 +357,7 @@ const MyChartPage: React.FC = () => {
 
       setLastRefreshTime(formatRefreshTimestamp());
     } catch (_error: unknown) {
-      return;
+      setPollingNotice('状态同步失败，将在下一轮自动重试');
     } finally {
       pollingRequestingRef.current = false;
       setRefreshingPending(false);
@@ -340,6 +389,7 @@ const MyChartPage: React.FC = () => {
     if (!hasPendingCharts) {
       setRefreshCountdown(POLLING_INTERVAL_SECONDS);
       setLastRefreshTime(undefined);
+      setPollingNotice(undefined);
       return;
     }
 
@@ -488,6 +538,7 @@ const MyChartPage: React.FC = () => {
                     最近同步：{lastRefreshTime}
                   </Text>
                 )}
+                {pollingNotice && <Tag color="warning">{pollingNotice}</Tag>}
                 <Button
                   type="link"
                   size="small"
