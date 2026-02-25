@@ -35,7 +35,15 @@ export const aggregateTaskStatusSummary = (
 };
 
 export const getTaskStatusSummaryText = (summary: TaskStatusSummary): string | undefined => {
-  if (summary.returnedCount <= 0) {
+  const statusCountTotal =
+    sumCount(summary.waitCount) +
+    sumCount(summary.runningCount) +
+    sumCount(summary.succeedCount) +
+    sumCount(summary.failedCount);
+
+  // 兼容后端分批统计字段 returnedCount 缺失或延迟同步的场景
+  const effectiveReturnedCount = Math.max(sumCount(summary.returnedCount), statusCountTotal);
+  if (effectiveReturnedCount <= 0) {
     return undefined;
   }
 
