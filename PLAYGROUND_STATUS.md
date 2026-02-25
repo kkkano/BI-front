@@ -4,9 +4,9 @@
 
 ## 自动心跳（Auto)
 
-- Auto ping: **2026-02-25 15:00 CST (UTC+8)**
-- Latest commit: **1a66de3**
-- Message: **feat(my-chart): use server-side status filter for pagination**
+- Auto ping: **2026-02-25 15:12 CST (UTC+8)**
+- Latest commit: **d67e757**
+- Message: **test: cover polling summary fallback for missing returnedCount**
 
 ## 当前阶段
 
