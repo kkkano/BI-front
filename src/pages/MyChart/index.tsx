@@ -199,21 +199,26 @@ const MyChartPage: React.FC = () => {
     [chartList],
   );
 
-  const visibleChartList = useMemo(() => {
-    if (statusFilter === 'all') {
-      return chartList;
-    }
-    return chartList.filter((chart) => chart.status === statusFilter);
-  }, [chartList, statusFilter]);
+  const applyStatusFilter = useCallback(
+    (nextStatus: 'all' | 'wait' | 'running' | 'succeed' | 'failed') => {
+      setStatusFilter(nextStatus);
+      setSearchParams((prev) => ({
+        ...prev,
+        current: 1,
+        status: nextStatus === 'all' ? undefined : nextStatus,
+      }));
+    },
+    [],
+  );
 
   const listEmptyText = useMemo(() => {
-    if (statusFilter !== 'all' && chartList.length > 0) {
+    if (statusFilter !== 'all') {
       const activeStatusLabel =
         STATUS_FILTER_OPTIONS.find((option) => option.value === statusFilter)?.label || '当前状态';
       return (
         <Space direction="vertical" size={8} align="center">
-          <Text type="secondary">当前页没有{activeStatusLabel}图表</Text>
-          <Button size="small" onClick={() => setStatusFilter('all')}>
+          <Text type="secondary">暂无{activeStatusLabel}图表</Text>
+          <Button size="small" onClick={() => applyStatusFilter('all')}>
             查看全部状态
           </Button>
         </Space>
@@ -258,7 +263,7 @@ const MyChartPage: React.FC = () => {
         </Space>
       </Empty>
     );
-  }, [chartList.length, searchParams.name, statusFilter]);
+  }, [applyStatusFilter, searchParams.name, statusFilter]);
 
   useEffect(() => {
     chartListRef.current = chartList;
@@ -282,7 +287,9 @@ const MyChartPage: React.FC = () => {
     try {
       const pendingChartIdChunks = chunkArray(pendingChartIds, TASK_STATUS_BATCH_SIZE);
       const batchResults = await Promise.allSettled(
-        pendingChartIdChunks.map((chartIds) => getChartTaskStatusBatchDetailUsingPOST({ chartIds })),
+        pendingChartIdChunks.map((chartIds) =>
+          getChartTaskStatusBatchDetailUsingPOST({ chartIds }),
+        ),
       );
 
       const taskStatusList: API.ChartTaskStatusVO[] = [];
@@ -540,13 +547,18 @@ const MyChartPage: React.FC = () => {
                 setSearchParams({
                   ...initSearchParams,
                   name: value || undefined,
+                  status: statusFilter === 'all' ? undefined : statusFilter,
                 })
               }
               onChange={(event) => {
                 if (event.target.value) {
                   return;
                 }
-                setSearchParams({ ...initSearchParams, name: undefined });
+                setSearchParams({
+                  ...initSearchParams,
+                  name: undefined,
+                  status: statusFilter === 'all' ? undefined : statusFilter,
+                });
               }}
             />
           </Col>
@@ -581,18 +593,9 @@ const MyChartPage: React.FC = () => {
             <Segmented
               size="small"
               value={statusFilter}
-              options={STATUS_FILTER_OPTIONS.map((option) => {
-                const count =
-                  option.value === 'all'
-                    ? chartList.length
-                    : chartList.filter((chart) => chart.status === option.value).length;
-                return {
-                  label: `${option.label} (${count})`,
-                  value: option.value,
-                };
-              })}
+              options={STATUS_FILTER_OPTIONS}
               onChange={(value) =>
-                setStatusFilter(value as 'all' | 'wait' | 'running' | 'succeed' | 'failed')
+                applyStatusFilter(value as 'all' | 'wait' | 'running' | 'succeed' | 'failed')
               }
             />
           </Col>
@@ -610,7 +613,7 @@ const MyChartPage: React.FC = () => {
           showSizeChanger: false,
         }}
         loading={loading}
-        dataSource={visibleChartList}
+        dataSource={chartList}
         locale={{ emptyText: listEmptyText }}
         renderItem={(item) => {
           const statusCfg = STATUS_CONFIG[item.status ?? ''];
