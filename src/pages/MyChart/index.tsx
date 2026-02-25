@@ -31,6 +31,7 @@ import Search from 'antd/es/input/Search';
 import type { ECharts, EChartsOption } from 'echarts';
 import { history } from '@umijs/max';
 import { aggregateTaskStatusSummary, getTaskStatusSummaryText } from './pollingNotice';
+import { formatChartCreateTime, normalizeChartNameKeyword } from './viewUtils';
 
 const { Text } = Typography;
 const FAILURE_REASON_COLLAPSE_KEY = 'failure-reason';
@@ -182,7 +183,6 @@ const MyChartPage: React.FC = () => {
   const [previewChart, setPreviewChart] = useState<{ title: string; option: EChartsOption } | null>(
     null,
   );
-  const [previewLoadingId, setPreviewLoadingId] = useState<number | undefined>();
   const [failureDetail, setFailureDetail] = useState<{ title: string; message: string } | null>(
     null,
   );
@@ -469,12 +469,10 @@ const MyChartPage: React.FC = () => {
   };
 
   const openChartPreview = (item: API.Chart, parsedChartOption: EChartsOption) => {
-    setPreviewLoadingId(item.id);
     setPreviewChart({
       title: item.name || '未命名图表',
       option: parsedChartOption,
     });
-    setPreviewLoadingId(undefined);
   };
 
   const openFailureDetail = (item: API.Chart) => {
@@ -543,15 +541,16 @@ const MyChartPage: React.FC = () => {
               enterButton="搜索"
               allowClear
               loading={loading}
-              onSearch={(value) =>
+              onSearch={(value) => {
+                const normalizedKeyword = normalizeChartNameKeyword(value);
                 setSearchParams({
                   ...initSearchParams,
-                  name: value || undefined,
+                  name: normalizedKeyword,
                   status: statusFilter === 'all' ? undefined : statusFilter,
-                })
-              }
+                });
+              }}
               onChange={(event) => {
-                if (event.target.value) {
+                if (normalizeChartNameKeyword(event.target.value)) {
                   return;
                 }
                 setSearchParams({
@@ -605,7 +604,7 @@ const MyChartPage: React.FC = () => {
         grid={{ gutter: 16, xs: 1, sm: 1, md: 1, lg: 2, xl: 2, xxl: 2 }}
         pagination={{
           onChange: (page, pageSize) =>
-            setSearchParams({ ...searchParams, current: page, pageSize }),
+            setSearchParams((prev) => ({ ...prev, current: page, pageSize })),
           current: searchParams.current,
           pageSize: searchParams.pageSize,
           total,
@@ -660,19 +659,13 @@ const MyChartPage: React.FC = () => {
                 extra={
                   <Space size="small">
                     <Text type="secondary" style={{ fontSize: isMobile ? 11 : 12 }}>
-                      {new Date(item.createTime as string).toLocaleString('zh-CN', {
-                        month: '2-digit',
-                        day: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                      {formatChartCreateTime(item.createTime)}
                     </Text>
                     {item.status === 'succeed' && parsedChartOption && (
                       <Button
                         type="link"
                         size="small"
                         onClick={() => openChartPreview(item, parsedChartOption)}
-                        loading={previewLoadingId === item.id}
                         style={{ padding: 0 }}
                       >
                         预览
