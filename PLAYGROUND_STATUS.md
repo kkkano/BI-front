@@ -4,9 +4,9 @@
 
 ## 自动心跳（Auto)
 
-- Auto ping: **2026-02-25 15:12 CST (UTC+8)**
-- Latest commit: **d67e757**
-- Message: **test: cover polling summary fallback for missing returnedCount**
+- Auto ping: **2026-02-25 16:21 CST (UTC+8)**
+- Latest commit: **2b1b10b**
+- Message: **feat(my-chart): sanitize search and harden create time display**
 
 ## 当前阶段
 
