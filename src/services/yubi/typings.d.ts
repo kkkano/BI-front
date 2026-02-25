@@ -174,6 +174,10 @@ declare namespace API {
     duplicateCount?: number;
     duplicateChartIds?: number[];
     returnedCount?: number;
+    waitCount?: number;
+    runningCount?: number;
+    succeedCount?: number;
+    failedCount?: number;
     unavailableCount?: number;
     unavailableChartIds?: number[];
     taskStatusList?: ChartTaskStatusVO[];

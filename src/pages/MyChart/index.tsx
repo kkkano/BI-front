@@ -30,6 +30,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Search from 'antd/es/input/Search';
 import type { ECharts, EChartsOption } from 'echarts';
 import { history } from '@umijs/max';
+import { aggregateTaskStatusSummary, getTaskStatusSummaryText } from './pollingNotice';
 
 const { Text } = Typography;
 const FAILURE_REASON_COLLAPSE_KEY = 'failure-reason';
@@ -286,6 +287,7 @@ const MyChartPage: React.FC = () => {
 
       const taskStatusList: API.ChartTaskStatusVO[] = [];
       const unavailableChartIdSet = new Set<number>();
+      const successfulBatchDataList: API.ChartTaskStatusBatchVO[] = [];
       let successChunkCount = 0;
       let duplicateCount = 0;
 
@@ -296,6 +298,9 @@ const MyChartPage: React.FC = () => {
         successChunkCount += 1;
 
         const batchData = result.value?.data;
+        if (batchData) {
+          successfulBatchDataList.push(batchData);
+        }
         duplicateCount += batchData?.duplicateCount ?? 0;
 
         batchData?.taskStatusList?.forEach((taskStatus) => {
@@ -342,6 +347,12 @@ const MyChartPage: React.FC = () => {
 
       if (duplicateCount > 0) {
         pollingNotices.push(`本轮查询已自动去重 ${duplicateCount} 个重复任务`);
+      }
+
+      const taskStatusSummary = aggregateTaskStatusSummary(successfulBatchDataList);
+      const taskStatusSummaryText = getTaskStatusSummaryText(taskStatusSummary);
+      if (taskStatusSummaryText) {
+        pollingNotices.push(taskStatusSummaryText);
       }
 
       setPollingNotice(pollingNotices.length > 0 ? pollingNotices.join('；') : undefined);
