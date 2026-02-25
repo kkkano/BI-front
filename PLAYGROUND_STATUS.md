@@ -4,9 +4,9 @@
 
 ## 自动心跳（Auto)
 
-- Auto ping: **2026-02-24 20:03 CST (UTC+8)**
-- Latest commit: **ebc74ba**
-- Message: **fix(polling): prioritize manual sync indicator over paused states**
+- Auto ping: **2026-02-25 14:53 CST (UTC+8)**
+- Latest commit: **33aea5e**
+- Message: **feat(my-chart): add batch status summary notice for polling**
 
 ## 当前阶段
 
