@@ -4,9 +4,9 @@
 
 ## 自动心跳（Auto)
 
-- Auto ping: **2026-02-25 14:53 CST (UTC+8)**
-- Latest commit: **33aea5e**
-- Message: **feat(my-chart): add batch status summary notice for polling**
+- Auto ping: **2026-02-25 15:00 CST (UTC+8)**
+- Latest commit: **1a66de3**
+- Message: **feat(my-chart): use server-side status filter for pagination**
 
 ## 当前阶段
 
