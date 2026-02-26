@@ -179,6 +179,9 @@ declare namespace API {
     succeedCount?: number;
     failedCount?: number;
     unavailableCount?: number;
+    pendingCount?: number;
+    terminalCount?: number;
+    allFinished?: boolean;
     unavailableChartIds?: number[];
     taskStatusList?: ChartTaskStatusVO[];
   };
