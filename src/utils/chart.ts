@@ -22,27 +22,55 @@ const pickFirstString = (...values: unknown[]): string | undefined => {
   return undefined;
 };
 
+const getMessageFromErrorObject = (error: Record<string, unknown>): string | undefined => {
+  const info = isObject(error.info) ? error.info : undefined;
+  const data = isObject(error.data) ? error.data : undefined;
+  const response = isObject(error.response) ? error.response : undefined;
+  const responseData = isObject(response?.data) ? response?.data : undefined;
+
+  const message = pickFirstString(
+    info?.errorMessage,
+    info?.message,
+    data?.errorMessage,
+    data?.message,
+    data?.msg,
+    responseData?.errorMessage,
+    responseData?.message,
+    responseData?.msg,
+    responseData?.description,
+    responseData?.detail,
+    error.errorMessage,
+    error.msg,
+    error.message,
+    response?.statusText,
+    error.statusText,
+  );
+
+  if (message) {
+    return message;
+  }
+
+  if (typeof response?.status === 'number' && response.status >= 400) {
+    return `请求失败（HTTP ${response.status}）`;
+  }
+
+  return undefined;
+};
+
 export const getErrorMessage = (error: unknown, fallback = '未知错误'): string => {
+  if (isObject(error)) {
+    const message = getMessageFromErrorObject(error);
+    if (message) {
+      return message;
+    }
+  }
+
   if (error instanceof Error && isNonEmptyString(error.message)) {
     return error.message;
   }
 
   if (isNonEmptyString(error)) {
     return error.trim();
-  }
-
-  if (isObject(error)) {
-    const data = isObject(error.data) ? error.data : undefined;
-    const message = pickFirstString(
-      error.message,
-      error.msg,
-      error.errorMessage,
-      data?.message,
-      data?.msg,
-    );
-    if (message) {
-      return message;
-    }
   }
 
   return fallback;
