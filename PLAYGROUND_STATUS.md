@@ -4,9 +4,9 @@
 
 ## 自动心跳（Auto)
 
-- Auto ping: **2026-02-27 07:15 CST (UTC+8)**
-- Latest commit: **66aec6e**
-- Message: **feat: improve frontend error message extraction for request failures**
+- Auto ping: **2026-02-27 07:35 CST (UTC+8)**
+- Latest commit: **331c202**
+- Message: **feat(my-chart): enrich batch polling summary with pending/allFinished**
 
 ## 当前阶段
 
